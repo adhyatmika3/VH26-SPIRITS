@@ -630,18 +630,41 @@
 
     state.selectedIncidentId = inc.id;
 
-    // Header updates
+    // Header & metadata updates from real incident object
     const titleElem = document.getElementById('incident-details-title');
     if (titleElem) titleElem.innerText = `${inc.incident_number || inc.id}: ${inc.title}`;
 
     const descElem = document.getElementById('incident-details-desc');
     if (descElem) descElem.innerText = inc.description || 'Correlated cluster of raw telemetry alerts.';
 
+    const numBadge = document.getElementById('incident-number-badge');
+    if (numBadge) numBadge.innerText = inc.incident_number || inc.id;
+
+    const sevBadge = document.getElementById('incident-severity-badge');
+    if (sevBadge) {
+      const isCrit = inc.priority === 'CRITICAL' || inc.severity === 'CRITICAL';
+      sevBadge.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ${
+        isCrit ? 'bg-error-container text-on-error-container' : 'bg-primary-fixed text-on-primary-fixed'
+      } font-code-sm text-code-sm font-semibold uppercase tracking-wider`;
+      sevBadge.innerHTML = `<span class="w-2 h-2 rounded-full ${isCrit ? 'bg-error' : 'bg-primary'} animate-pulse"></span>${inc.priority || inc.severity || 'HIGH'} SEVERITY`;
+    }
+
+    const timeElem = document.getElementById('incident-started-time');
+    if (timeElem) {
+      timeElem.innerText = inc.first_seen ? new Date(inc.first_seen).toUTCString() : (inc.created_at ? new Date(inc.created_at).toUTCString() : 'Active');
+    }
+
+    const statusElem = document.getElementById('incident-status-tag');
+    if (statusElem) {
+      statusElem.innerText = inc.status || 'OPEN';
+      statusElem.className = inc.status === 'RESOLVED' ? 'font-medium text-emerald-600 uppercase' : inc.status === 'ACKNOWLEDGED' ? 'font-medium text-blue-600 uppercase' : 'font-medium text-amber-600 uppercase';
+    }
+
     const leadElem = document.getElementById('incident-lead-service');
-    if (leadElem) leadElem.innerText = inc.service;
+    if (leadElem) leadElem.innerText = inc.service || 'service';
 
     const ownerElem = document.getElementById('incident-owner');
-    if (ownerElem) ownerElem.innerText = inc.commander || 'Alex Rivera (Lead SRE)';
+    if (ownerElem) ownerElem.innerText = inc.commander || 'Automated SRE Engine';
 
     // Update Incident Select Dropdown
     const selectDropdown = document.getElementById('incident-select-dropdown');
@@ -660,39 +683,37 @@
       if (matchingAlerts.length === 0) {
         matchingAlerts = state.alerts.filter((a) => a.service === inc.service);
       }
-      if (matchingAlerts.length === 0) {
-        matchingAlerts = state.alerts.slice(0, 3);
-      }
 
       if (alertsBadge) {
-        alertsBadge.innerText = `${matchingAlerts.length} Alerts Grouped`;
+        alertsBadge.innerText = `${matchingAlerts.length} Real Alerts`;
       }
 
       groupedTbody.innerHTML = '';
-      matchingAlerts.forEach((alt) => {
-        const tr = document.createElement('tr');
-        tr.className = 'border-b border-surface-container-high hover:bg-surface-container-low transition-colors cursor-pointer';
-        const timeStr = alt.created_at ? new Date(alt.created_at).toLocaleTimeString() : (alt.timestamp || '—');
-        const isSuppressed = alt.status === 'SUPPRESSED' || alt.is_duplicate;
-        const statusBadge = isSuppressed
-          ? `<span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-code-sm text-[11px]">Suppressed</span>`
-          : `<span class="px-2 py-0.5 rounded bg-primary-container text-on-primary font-code-sm text-[11px]">Notified</span>`;
+      if (matchingAlerts.length === 0) {
+        groupedTbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-secondary text-xs">No individual alert rows linked directly to this cluster.</td></tr>`;
+      } else {
+        matchingAlerts.forEach((alt) => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-surface-container-high hover:bg-surface-container-low transition-colors';
+          const timeStr = alt.created_at ? new Date(alt.created_at).toLocaleTimeString() : (alt.timestamp || '—');
+          const isSuppressed = alt.status === 'SUPPRESSED' || alt.is_duplicate;
+          const statusBadge = isSuppressed
+            ? `<span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-code-sm text-[11px]">Suppressed</span>`
+            : `<span class="px-2 py-0.5 rounded bg-primary-container text-on-primary font-code-sm text-[11px]">Notified</span>`;
 
-        tr.innerHTML = `
-          <td class="py-2.5 px-3 font-code-sm text-xs text-secondary">${timeStr}</td>
-          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] font-bold ${alt.severity === 'CRITICAL' ? 'text-error' : 'text-primary'}">${alt.severity || 'INFO'}</span></td>
-          <td class="py-2.5 px-3 font-semibold font-code-sm text-xs text-on-surface">${alt.title || alt.alert_name || 'Alert'}</td>
-          <td class="py-2.5 px-3 font-code-sm text-xs text-primary">${alt.service || inc.service}</td>
-          <td class="py-2.5 px-3">${statusBadge}</td>
-          <td class="py-2.5 px-3 text-right">
-            <button onclick="event.stopPropagation(); window.openAlertDecisionDrawer('${alt.id}')" class="px-2 py-1 rounded bg-surface-container text-primary font-code-sm text-xs hover:bg-primary hover:text-white transition-colors">
-              Explain
-            </button>
-          </td>
-        `;
-        tr.addEventListener('click', () => window.openAlertDecisionDrawer(alt.id));
-        groupedTbody.appendChild(tr);
-      });
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 font-code-sm text-xs text-secondary">${timeStr}</td>
+            <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] font-bold ${alt.severity === 'CRITICAL' ? 'text-error' : 'text-primary'}">${alt.severity || 'INFO'}</span></td>
+            <td class="py-2.5 px-3 font-semibold font-code-sm text-xs text-on-surface">${alt.title || alt.alert_name || 'Alert'}</td>
+            <td class="py-2.5 px-3 font-code-sm text-xs text-primary">${alt.service || inc.service}</td>
+            <td class="py-2.5 px-3">${statusBadge}</td>
+            <td class="py-2.5 px-3 text-right">
+              <span class="font-code-sm text-[11px] text-secondary">Cluster Member</span>
+            </td>
+          `;
+          groupedTbody.appendChild(tr);
+        });
+      }
     }
 
     // Load real chronological timeline from API
@@ -861,7 +882,7 @@
         if (elemMtta) {
           elemMtta.innerText = state.summary && state.summary.mtta_seconds > 0
             ? state.summary.mtta_formatted
-            : '0.2s';
+            : 'Awaiting data';
         }
       }
 

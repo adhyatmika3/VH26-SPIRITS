@@ -477,22 +477,22 @@
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md relative z-10">
             <div class="flex flex-col gap-space-2xs">
               <div class="flex flex-wrap items-center gap-space-sm">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-code-sm text-code-sm font-semibold uppercase tracking-wider">
-                  <span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
-                  Critical Severity
+                <span id="incident-severity-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-code-sm font-semibold uppercase tracking-wider">
+                  <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                  Active Cluster
                 </span>
-                <span class="font-code-md text-code-md text-secondary font-semibold">INC-1042</span>
+                <span id="incident-number-badge" class="font-code-md text-code-md text-secondary font-semibold">INC-CLUSTER</span>
                 <span class="w-1 h-1 rounded-full bg-outline-variant"></span>
                 <span class="inline-flex items-center gap-1 text-on-surface-variant font-body-sm text-body-sm">
                   <span class="material-symbols-outlined text-[15px] text-tertiary">hub</span>
-                  Root Cause Triaged
+                  Root Cause Correlation
                 </span>
               </div>
               <h1 id="incident-details-title" class="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">
-                INC-1042: Database Connection Cascade
+                Correlated Incident Investigation
               </h1>
               <p id="incident-details-desc" class="font-body-md text-body-md text-on-surface-variant max-w-4xl">
-                Cascading connection pool failure on postgres-primary impacting downstream checkout and payment authorization services.
+                Loading correlated incident cluster telemetry from live backend...
               </p>
             </div>
             <div class="flex items-center gap-space-xs shrink-0 flex-wrap">
@@ -504,7 +504,7 @@
                 <span class="material-symbols-outlined text-[17px]">check_circle</span>
                 <span>Resolve Incident</span>
               </button>
-              <button onclick="showToast('Runbook automated steps loaded', 'info')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors">
+              <button onclick="showToast('Runbook automated verification steps loaded', 'info')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors">
                 <span class="material-symbols-outlined text-[17px] text-secondary">assignment_turned_in</span>
                 <span>Runbook</span>
               </button>
@@ -516,24 +516,23 @@
           <div class="flex flex-wrap items-center gap-x-space-lg gap-y-space-xs pt-space-xs text-on-surface-variant font-label-sm text-label-sm bg-surface-container-low/70 px-space-base py-space-xs rounded-lg">
             <div class="flex items-center gap-1.5">
               <span class="material-symbols-outlined text-[16px] text-secondary">schedule</span>
-              <span class="text-secondary">Started:</span>
-              <span class="font-code-sm text-code-sm text-on-surface font-medium">14:32:08 UTC</span>
-              <span class="text-error font-medium">(18m ago)</span>
+              <span class="text-secondary">First Trigger:</span>
+              <span id="incident-started-time" class="font-code-sm text-code-sm text-on-surface font-medium">—</span>
             </div>
             <div class="flex items-center gap-1.5">
               <span class="material-symbols-outlined text-[16px] text-primary">radio_button_checked</span>
               <span class="text-secondary">Status:</span>
-              <span class="font-medium text-primary uppercase">Investigating</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px] text-secondary">account_circle</span>
-              <span class="text-secondary">Lead:</span>
-              <span id="incident-owner" class="font-medium text-on-surface">Alex Rivera (Lead SRE)</span>
+              <span id="incident-status-tag" class="font-medium text-primary uppercase">OPEN</span>
             </div>
             <div class="flex items-center gap-1.5">
               <span class="material-symbols-outlined text-[16px] text-secondary">lan</span>
               <span class="text-secondary">Lead Service:</span>
-              <span id="incident-lead-service" class="font-code-sm text-code-sm text-primary font-semibold">payment-gateway</span>
+              <span id="incident-lead-service" class="font-code-sm text-code-sm text-primary font-semibold">—</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-secondary">account_circle</span>
+              <span class="text-secondary">Responder:</span>
+              <span id="incident-owner" class="font-medium text-on-surface">Automated SRE Engine</span>
             </div>
           </div>
         </div>
@@ -585,7 +584,7 @@
                   <th class="py-2.5 px-3">Alert Title</th>
                   <th class="py-2.5 px-3">Service</th>
                   <th class="py-2.5 px-3">Status</th>
-                  <th class="py-2.5 px-3 text-right">Decision</th>
+                  <th class="py-2.5 px-3 text-right">Cluster</th>
                 </tr>
               </thead>
               <tbody id="incident-grouped-alerts-tbody">
@@ -605,7 +604,7 @@
           <div class="space-y-1">
             <div class="flex items-center gap-2">
               <span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-xs font-bold uppercase">Impact Analytics</span>
-              <span class="font-code-sm text-xs text-secondary">REAL DATABASE METRICS</span>
+              <span class="font-code-sm text-xs text-secondary">POSTGRESQL DERIVED METRICS</span>
             </div>
             <h2 class="font-headline-lg text-2xl font-bold text-on-surface tracking-tight">Fatigue Reduction & Operational Efficiency</h2>
             <p class="text-sm text-on-surface-variant max-w-3xl">
@@ -629,7 +628,7 @@
               <span class="material-symbols-outlined text-[20px] text-emerald-600">tune</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-emerald-600 font-code-sm" id="analytics-noise-reduction">48.5%</span>
+              <span class="text-3xl font-bold text-emerald-600 font-code-sm" id="analytics-noise-reduction">0.0%</span>
               <p class="text-xs text-on-surface-variant mt-1">Percentage of alerts that did not need to interrupt a responder</p>
             </div>
             <span class="text-[11px] font-code-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">Primary Fatigue Metric</span>
@@ -642,7 +641,7 @@
               <span class="material-symbols-outlined text-[20px] text-primary">filter_alt</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-primary font-code-sm" id="analytics-dedup-rate">51.5%</span>
+              <span class="text-3xl font-bold text-primary font-code-sm" id="analytics-dedup-rate">0.0%</span>
               <p class="text-xs text-on-surface-variant mt-1">Spikes and repeated notifications coalesced into single streams</p>
             </div>
             <span class="text-[11px] font-code-sm text-primary bg-primary-fixed px-2 py-0.5 rounded font-medium">Sliding Cooldown</span>
@@ -655,7 +654,7 @@
               <span class="material-symbols-outlined text-[20px] text-violet-600">send</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-violet-600 font-code-sm" id="analytics-notification-rate">15.2%</span>
+              <span class="text-3xl font-bold text-violet-600 font-code-sm" id="analytics-notification-rate">0.0%</span>
               <p class="text-xs text-on-surface-variant mt-1">Actionable alerts approved for human SRE on-call dispatch</p>
             </div>
             <span class="text-[11px] font-code-sm text-violet-700 bg-violet-50 px-2 py-0.5 rounded font-medium">High Signal Ratio</span>
@@ -664,14 +663,14 @@
           <!-- Rate 4: Average Time to Acknowledge (MTTA) -->
           <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-secondary uppercase">Average Time to Acknowledge</span>
+              <span class="text-xs font-bold text-secondary uppercase">Time to Acknowledge (MTTA)</span>
               <span class="material-symbols-outlined text-[20px] text-amber-600">timer</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-amber-600 font-code-sm" id="analytics-mtta">0s</span>
-              <p class="text-xs text-on-surface-variant mt-1">Time from first telemetry trigger until operator attribution</p>
+              <span class="text-3xl font-bold text-amber-600 font-code-sm" id="analytics-mtta">Awaiting data</span>
+              <p class="text-xs text-on-surface-variant mt-1">Average duration from trigger to operator acknowledgment</p>
             </div>
-            <span class="text-[11px] font-code-sm text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium">MTTA Benchmark</span>
+            <span class="text-[11px] font-code-sm text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium">Incident Response Speed</span>
           </div>
         </div>
 
@@ -698,30 +697,7 @@
                 </tr>
               </thead>
               <tbody id="noisy-services-tbody">
-                <tr class="border-b border-surface-container-high hover:bg-surface-container-low">
-                  <td class="py-2.5 px-3 font-semibold font-code-sm text-primary">checkout-api</td>
-                  <td class="py-2.5 px-3 font-code-sm">18</td>
-                  <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-semibold">12</td>
-                  <td class="py-2.5 px-3 font-code-sm text-violet-600 font-semibold">2</td>
-                  <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-bold">66.7%</td>
-                  <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-code-sm text-xs font-bold">Protected</span></td>
-                </tr>
-                <tr class="border-b border-surface-container-high hover:bg-surface-container-low">
-                  <td class="py-2.5 px-3 font-semibold font-code-sm text-primary">billing-service</td>
-                  <td class="py-2.5 px-3 font-code-sm">10</td>
-                  <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-semibold">8</td>
-                  <td class="py-2.5 px-3 font-code-sm text-violet-600 font-semibold">1</td>
-                  <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-bold">80.0%</td>
-                  <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-code-sm text-xs font-bold">Protected</span></td>
-                </tr>
-                <tr class="hover:bg-surface-container-low">
-                  <td class="py-2.5 px-3 font-semibold font-code-sm text-primary">worker-service</td>
-                  <td class="py-2.5 px-3 font-code-sm">5</td>
-                  <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-semibold">4</td>
-                  <td class="py-2.5 px-3 font-code-sm text-violet-600 font-semibold">0</td>
-                  <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-bold">80.0%</td>
-                  <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-code-sm text-xs font-bold">Filtered</span></td>
-                </tr>
+                <!-- Dynamically populated from /api/v1/analytics/noisy-services -->
               </tbody>
             </table>
           </div>
