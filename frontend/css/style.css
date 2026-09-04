@@ -152,3 +152,86 @@
 .modal-overlay.active {
   display: flex;
 }
+
+/* Slide-out Drawer */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.drawer-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 580px;
+  background-color: #ffffff;
+  box-shadow: -10px 0 25px -5px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-panel.open {
+  transform: translateX(0);
+}
+
+/* Timeline Components */
+.timeline-stem {
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 19px;
+  width: 2px;
+  background: #e2e8f0;
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 48px;
+  padding-bottom: 24px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-item-dot {
+  position: absolute;
+  left: 8px;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  border: 2px solid var(--color-primary);
+  z-index: 2;
+}
+
+/* Replay Glow */
+@keyframes replay-glow {
+  0%, 100% { box-shadow: 0 0 15px rgba(79, 70, 229, 0.4); }
+  50% { box-shadow: 0 0 25px rgba(79, 70, 229, 0.8); }
+}
+
+.replay-active-btn {
+  animation: replay-glow 1.5s infinite;
+}
+
