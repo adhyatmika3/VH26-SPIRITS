@@ -421,7 +421,7 @@
     }, 1000);
   }
 
-  // Live Backend Analytics Integration (Phase 4)
+  // Live Backend Analytics Integration (Phase 4 - Near-Real-Time Polling)
   async function fetchLiveAnalytics() {
     try {
       const resp = await fetch('http://localhost:8000/api/v1/analytics/overview');
@@ -431,7 +431,8 @@
           state.stats.incomingAlerts = data.total_alerts;
           state.stats.actionableAlerts = data.notified_alerts + data.escalated_alerts;
           state.stats.fatigueAbsorptionPercent = data.suppression_rate;
-          state.stats.activeDedupePool = data.suppressed_alerts;
+          // Correction 1: Map real active deduplication fingerprint pool count
+          state.stats.activeDedupePool = data.active_dedupe_pool;
           if (data.average_processing_time_ms > 0) {
             state.stats.ingressVelocity = data.average_processing_time_ms;
           }
@@ -451,13 +452,13 @@
           'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full bg-primary transition-colors duration-200 ease-in-out focus:outline-none';
         elements.streamThumb.className =
           'translate-x-4 inline-block h-4 w-4 transform rounded-full bg-on-primary transition duration-200 ease-in-out mt-0.5 ml-0.5';
-        showToast('Live auto-refresh enabled (2s)', 'info');
+        showToast('Near-real-time auto-refresh active (2s polling)', 'info');
       } else {
         elements.streamToggle.className =
           'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full bg-surface-container-highest transition-colors duration-200 ease-in-out focus:outline-none';
         elements.streamThumb.className =
           'translate-x-0 inline-block h-4 w-4 transform rounded-full bg-outline transition duration-200 ease-in-out mt-0.5 ml-0.5';
-        showToast('Live auto-refresh paused', 'warning');
+        showToast('Near-real-time auto-refresh paused', 'warning');
       }
     }
   };

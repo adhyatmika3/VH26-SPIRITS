@@ -16,6 +16,7 @@ from app.schemas.analytics import (
     TimelinePoint,
     DecisionDistributionResponse
 )
+from app.core.config import settings
 from app.core.logging import logger
 
 
@@ -103,6 +104,15 @@ def get_analytics_overview(
     notification_rate = round((notified_alerts / effective_total * 100.0), 2) if effective_total > 0 else 0.0
     escalation_rate = round((escalated_alerts / effective_total * 100.0), 2) if effective_total > 0 else 0.0
 
+    # Calculate real active deduplication fingerprint pool within sliding window
+    now_utc = datetime.now(timezone.utc)
+    dedup_cutoff = now_utc - timedelta(seconds=settings.DEDUP_WINDOW_SECONDS)
+    active_dedupe_pool = (
+        db.query(func.count(func.distinct(CanonicalAlert.fingerprint)))
+        .filter(CanonicalAlert.last_seen >= dedup_cutoff)
+        .scalar() or 0
+    )
+
     return AnalyticsOverviewResponse(
         total_alerts=effective_total,
         processed_alerts=processed_alerts,
@@ -113,7 +123,8 @@ def get_analytics_overview(
         notification_rate=notification_rate,
         escalation_rate=escalation_rate,
         alert_reduction=suppressed_alerts,
-        average_processing_time_ms=round(avg_latency, 2)
+        average_processing_time_ms=round(avg_latency, 2),
+        active_dedupe_pool=int(active_dedupe_pool)
     )
 
 

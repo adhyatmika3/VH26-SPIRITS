@@ -48,7 +48,7 @@
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "targets": [
         {
-          "expr": "100 * (sum(rate(alerts_decided_total{decision=\"SUPPRESS\"}[5m])) or sum(alerts_decided_total{decision=\"SUPPRESS\"})) / clamp_min((sum(rate(alerts_decided_total[5m])) or sum(alerts_decided_total)), 0.0001)",
+          "expr": "100 * (sum(rate(alerts_suppressed_total[5m])) or sum(rate(alerts_decided_total{decision=\"SUPPRESS\"}[5m])) or sum(alerts_suppressed_total)) / clamp_min((sum(rate(alerts_processed_total[5m])) or sum(rate(alerts_decided_total[5m])) or sum(alerts_processed_total)), 0.0001)",
           "legendFormat": "Suppression %",
           "refId": "A"
         }
@@ -78,7 +78,7 @@
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "targets": [
         {
-          "expr": "100 * (sum(rate(alerts_decided_total{decision=\"NOTIFY\"}[5m])) or sum(alerts_decided_total{decision=\"NOTIFY\"})) / clamp_min((sum(rate(alerts_decided_total[5m])) or sum(alerts_decided_total)), 0.0001)",
+          "expr": "100 * (sum(rate(alerts_notified_total[5m])) or sum(rate(alerts_decided_total{decision=\"NOTIFY\"}[5m])) or sum(alerts_notified_total)) / clamp_min((sum(rate(alerts_processed_total[5m])) or sum(rate(alerts_decided_total[5m])) or sum(alerts_processed_total)), 0.0001)",
           "legendFormat": "Notification %",
           "refId": "A"
         }
@@ -108,7 +108,7 @@
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "targets": [
         {
-          "expr": "100 * (sum(rate(alerts_decided_total{decision=\"ESCALATE\"}[5m])) or sum(alerts_decided_total{decision=\"ESCALATE\"})) / clamp_min((sum(rate(alerts_decided_total[5m])) or sum(alerts_decided_total)), 0.0001)",
+          "expr": "100 * (sum(rate(alerts_escalated_total[5m])) or sum(rate(alerts_decided_total{decision=\"ESCALATE\"}[5m])) or sum(alerts_escalated_total)) / clamp_min((sum(rate(alerts_processed_total[5m])) or sum(rate(alerts_decided_total[5m])) or sum(alerts_processed_total)), 0.0001)",
           "legendFormat": "Escalation %",
           "refId": "A"
         }
@@ -257,7 +257,7 @@
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "targets": [
         {
-          "expr": "sum by (channel) (rate(notification_failure_total[1m]))",
+          "expr": "sum by (channel) (rate(notification_failures_total[1m])) or sum by (channel) (rate(notification_failure_total[1m]))",
           "legendFormat": "Delivery Failures: {{channel}}",
           "refId": "A"
         }

@@ -117,6 +117,8 @@ def test_analytics_overview_calculation_and_rates(client: TestClient, db_session
     assert data["suppression_rate"] > 0.0
     assert data["notification_rate"] > 0.0
     assert data["average_processing_time_ms"] >= 0.0
+    assert "active_dedupe_pool" in data
+    assert data["active_dedupe_pool"] >= 1
 
 
 def test_analytics_severity_distribution(client: TestClient):
@@ -310,3 +312,50 @@ def test_decision_record_stores_latency(client: TestClient, db_session: Session)
     assert rec is not None
     assert rec.processing_time_ms is not None
     assert rec.processing_time_ms >= 0.0
+
+
+def test_prometheus_metrics_audit_and_bounded_labels(client: TestClient):
+    """
+    Audits all 12 required Prometheus metrics and verifies bounded label sanitization.
+    """
+    # Ingest alert with long arbitrary service name
+    long_service = "order-checkout-payment-microservice-instance-very-long-99999"
+    r = client.post("/api/v1/alerts/webhook", json={
+        "source": "prometheus",
+        "alert_name": "LabelAuditAlert",
+        "severity": "critical",
+        "status": "firing",
+        "service": long_service,
+        "message": "Testing bounded labels",
+        "labels": {"environment": "production"},
+        "annotations": {},
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    assert r.status_code == 201
+
+    metrics_resp = client.get("/metrics")
+    assert metrics_resp.status_code == 200
+    content = metrics_resp.text
+
+    # All 12 required metrics must exist
+    required_metrics = [
+        "alerts_received_total",
+        "alerts_processed_total",
+        "alerts_decided_total",
+        "alerts_suppressed_total",
+        "alerts_notified_total",
+        "alerts_escalated_total",
+        "notification_success_total",
+        "notification_failures_total",
+        "alert_processing_failures_total",
+        "alerts_in_processing",
+        "alert_processing_duration_seconds",
+        "notification_duration_seconds"
+    ]
+    for metric_name in required_metrics:
+        assert metric_name in content, f"Expected metric '{metric_name}' in /metrics"
+
+    # Verify that long service label was safely bounded to <= 32 characters
+    assert long_service not in content
+    bounded_service = long_service[:32]
+    assert bounded_service in content

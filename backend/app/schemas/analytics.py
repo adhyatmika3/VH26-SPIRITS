@@ -8,11 +8,12 @@ class AnalyticsOverviewResponse(BaseModel):
     suppressed_alerts: int = Field(..., description="Total count of alerts suppressed")
     notified_alerts: int = Field(..., description="Total count of alerts approved for notification")
     escalated_alerts: int = Field(..., description="Total count of alerts escalated")
-    suppression_rate: float = Field(..., description="Percentage of alerts suppressed")
+    suppression_rate: float = Field(..., description="Percentage of alerts suppressed (primary fatigue reduction measure)")
     notification_rate: float = Field(..., description="Percentage of alerts notified")
     escalation_rate: float = Field(..., description="Percentage of alerts escalated")
     alert_reduction: int = Field(..., description="Absolute count of alerts suppressed from waking operators")
     average_processing_time_ms: float = Field(..., description="Average processing latency in milliseconds")
+    active_dedupe_pool: int = Field(default=0, description="Active unique alert fingerprints in the sliding deduplication window")
 
 
 class SeverityDistributionItem(BaseModel):

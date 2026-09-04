@@ -1,4 +1,41 @@
+import re
+from typing import Optional
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+# Bounded label dictionaries and sanitizers to prevent high-cardinality label explosion
+CONTROLLED_REASON_CODES = {
+    "NEW_INCIDENT", "CRITICAL_SEVERITY", "ERROR_SEVERITY", "HIGH_SEVERITY",
+    "WARNING_SEVERITY", "INFO_SEVERITY", "PRODUCTION_ENVIRONMENT", "ALERT_STORM_ACTIVE",
+    "LOW_SEVERITY_NON_PROD", "INCIDENT_RESOLVED", "ALERT_RESOLVED_INCIDENT_ACTIVE",
+    "SEVERITY_INCREASED", "CRITICAL_PRIORITY", "COOLDOWN_ACTIVE", "DUPLICATE_ALERT",
+    "CORRELATED_INCIDENT_ACTIVE", "UNRESOLVED_CRITICAL", "ESCALATION_THRESHOLD_REACHED",
+    "HIGH_VELOCITY_BURST", "ALREADY_ESCALATED", "ESCALATION_IDEMPOTENT_SKIP", "UNKNOWN"
+}
+
+
+def sanitize_service_label(service: Optional[str]) -> str:
+    """
+    Ensures bounded cardinality for service label in Prometheus.
+    Cleans, strips non-identifier chars, and bounds length to prevent metric explosion.
+    """
+    if not service:
+        return "unknown"
+    clean = re.sub(r"[^a-zA-Z0-9_\-]", "", str(service).lower().strip())
+    if len(clean) > 32:
+        return clean[:32]
+    return clean or "unknown"
+
+
+def sanitize_reason_code_label(reason: Optional[str]) -> str:
+    """
+    Ensures bounded cardinality for reason_code label in Prometheus.
+    Only allows recognized structured decision reason codes, mapping arbitrary values to OTHER.
+    """
+    if not reason:
+        return "UNKNOWN"
+    clean = str(reason).upper().strip()
+    return clean if clean in CONTROLLED_REASON_CODES else "OTHER"
+
 
 # Ingestion & Processing Counters
 ALERTS_RECEIVED_TOTAL = Counter(
@@ -119,6 +156,7 @@ def record_processed_metric(source: str, severity: str, decision: str) -> None:
 
 
 def record_processing_failure_metric(stage: str) -> None:
+    ALERTS_IN_PROCESSING._value.set(max(0, ALERTS_IN_PROCESSING._value.get() - 1)) if hasattr(ALERTS_IN_PROCESSING, "_value") else None
     ALERT_PROCESSING_FAILURES_TOTAL.labels(
         stage=(stage or "unknown").lower()
     ).inc()
@@ -137,29 +175,32 @@ def record_notification_duration(channel: str, duration: float) -> None:
 
 
 def record_decision_metric(decision: str, severity: str, environment: str, service: str, reason_codes: list[str]) -> None:
+    clean_svc = sanitize_service_label(service)
     ALERTS_DECIDED_TOTAL.labels(
         decision=decision.upper(),
         severity=severity.upper(),
         environment=environment.lower(),
-        service=service.lower()
+        service=clean_svc
     ).inc()
 
     if decision.upper() == "SUPPRESS":
-        primary_reason = reason_codes[0] if reason_codes else "UNKNOWN"
+        raw_reason = reason_codes[0] if reason_codes else "UNKNOWN"
+        bounded_reason = sanitize_reason_code_label(raw_reason)
         ALERTS_SUPPRESSED_TOTAL.labels(
-            reason_code=primary_reason,
-            service=service.lower()
+            reason_code=bounded_reason,
+            service=clean_svc
         ).inc()
 
 
 def record_notification_metric(channel: str, success: bool, priority: str = "MEDIUM", service: str = "unknown") -> None:
     ch = (channel or "slack").lower()
+    clean_svc = sanitize_service_label(service)
     if success:
         NOTIFICATION_SUCCESS_TOTAL.labels(channel=ch).inc()
         ALERTS_NOTIFIED_TOTAL.labels(
             priority=(priority or "MEDIUM").upper(),
             channel=ch,
-            service=(service or "unknown").lower()
+            service=clean_svc
         ).inc()
     else:
         NOTIFICATION_FAILURE_TOTAL.labels(channel=ch).inc()
@@ -167,15 +208,18 @@ def record_notification_metric(channel: str, success: bool, priority: str = "MED
 
 
 def record_escalation_metric(severity: str, service: str) -> None:
+    clean_svc = sanitize_service_label(service)
     ALERTS_ESCALATED_TOTAL.labels(
         severity=(severity or "HIGH").upper(),
-        service=(service or "unknown").lower()
+        service=clean_svc
     ).inc()
 
 
 def record_acknowledgement_metric(service: str) -> None:
-    ALERT_ACKNOWLEDGEMENTS_TOTAL.labels(service=(service or "unknown").lower()).inc()
+    clean_svc = sanitize_service_label(service)
+    ALERT_ACKNOWLEDGEMENTS_TOTAL.labels(service=clean_svc).inc()
 
 
 def record_resolution_metric(service: str) -> None:
-    ALERT_RESOLUTIONS_TOTAL.labels(service=(service or "unknown").lower()).inc()
+    clean_svc = sanitize_service_label(service)
+    ALERT_RESOLUTIONS_TOTAL.labels(service=clean_svc).inc()
