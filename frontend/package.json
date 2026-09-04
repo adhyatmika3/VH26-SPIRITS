@@ -1,0 +1,12 @@
+{
+  "name": "alert-fatigue-buster-frontend",
+  "version": "1.0.0",
+  "description": "Alert Fatigue Buster - SRE Intelligence & Telemetry Reduction Web Platform",
+  "scripts": {
+    "dev": "npx serve -p 3000 .",
+    "start": "npx serve -p 3000 ."
+  },
+  "keywords": ["sre", "observability", "alerting", "deduplication", "incident-management"],
+  "author": "Alert Fatigue Buster Team",
+  "license": "MIT"
+}

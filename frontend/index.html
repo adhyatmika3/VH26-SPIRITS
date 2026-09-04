@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Alert Fatigue Buster - SRE Intelligence Platform</title>
+  <meta name="description" content="Precision-engineered SRE observability and alert noise reduction platform."/>
+  
+  <!-- Material Symbols & Geist Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-highest": "#e0e3e5",
+            "surface-container-high": "#e6e8ea",
+            "tertiary-fixed": "#cce5ff",
+            "tertiary-container": "#00659a",
+            "on-secondary-fixed-variant": "#3f465c",
+            "surface-dim": "#d8dadc",
+            "secondary-fixed": "#dae2fd",
+            "primary-fixed-dim": "#c3c0ff",
+            "secondary-container": "#dae2fd",
+            "surface-tint": "#4d44e3",
+            "inverse-surface": "#2d3133",
+            "on-primary-container": "#dad7ff",
+            "on-secondary": "#ffffff",
+            "tertiary-fixed-dim": "#93ccff",
+            "on-tertiary-container": "#bedfff",
+            "surface-container-low": "#f2f4f6",
+            "outline-variant": "#c7c4d8",
+            "on-primary": "#ffffff",
+            "surface-bright": "#f7f9fb",
+            "inverse-on-surface": "#eff1f3",
+            "error": "#ba1a1a",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-lowest": "#ffffff",
+            "background": "#f7f9fb",
+            "on-secondary-fixed": "#131b2e",
+            "outline": "#777587",
+            "on-tertiary-fixed-variant": "#004b73",
+            "primary-fixed": "#e2dfff",
+            "secondary-fixed-dim": "#bec6e0",
+            "secondary": "#565e74",
+            "error-container": "#ffdad6",
+            "on-error": "#ffffff",
+            "surface-container": "#eceef0",
+            "on-tertiary": "#ffffff",
+            "on-background": "#191c1e",
+            "primary": "#3525cd",
+            "on-surface": "#191c1e",
+            "on-secondary-container": "#5c647a",
+            "on-surface-variant": "#464555",
+            "tertiary": "#004c76",
+            "inverse-primary": "#c3c0ff",
+            "on-tertiary-fixed": "#001d31",
+            "primary-container": "#4f46e5",
+            "on-primary-fixed-variant": "#3323cc",
+            "on-error-container": "#93000a",
+            "surface-variant": "#e0e3e5",
+            "surface": "#f7f9fb"
+          },
+          borderRadius: {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          spacing: {
+            "space-base": "1rem",
+            "gutter-normal": "1rem",
+            "space-lg": "1.25rem",
+            "space-2xl": "2rem",
+            "gutter-compact": "0.75rem",
+            "space-xs": "0.25rem",
+            "space-md": "0.75rem",
+            "space-2xs": "0.125rem",
+            "space-xl": "1.5rem",
+            "space-sm": "0.5rem",
+            "gutter-loose": "1.5rem"
+          },
+          fontFamily: {
+            "headline-sm": ["Geist", "sans-serif"],
+            "headline-lg": ["Geist", "sans-serif"],
+            "body-md": ["Geist", "sans-serif"],
+            "code-md": ["JetBrains Mono", "monospace"],
+            "body-sm": ["Geist", "sans-serif"],
+            "display": ["Geist", "sans-serif"],
+            "body-lg": ["Geist", "sans-serif"],
+            "label-sm": ["Geist", "sans-serif"],
+            "code-lg": ["JetBrains Mono", "monospace"],
+            "label-md": ["Geist", "sans-serif"],
+            "display-mobile": ["Geist", "sans-serif"],
+            "code-sm": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+
+<body class="bg-background font-body-md text-on-surface antialiased selection:bg-primary selection:text-on-primary">
+  
+  <!-- Sidebar Navigation -->
+  <aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest border-r border-surface-container-highest z-50 flex flex-col justify-between select-none shadow-sm">
+    <div class="flex flex-col flex-1 overflow-y-auto">
+      <!-- Logo Header -->
+      <div class="h-14 px-space-base flex items-center gap-space-sm border-b border-surface-container-highest bg-surface-container-lowest shrink-0 cursor-pointer" onclick="navigateTo('dashboard')">
+        <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-sm">
+          <span class="material-symbols-outlined text-[20px]">filter_alt</span>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-space-xs">
+            <span class="font-headline-sm text-[16px] font-bold text-on-surface leading-tight">Alert Buster</span>
+          </div>
+          <span class="font-label-sm text-[10px] text-primary tracking-wider uppercase font-bold">SRE Intelligence</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="flex-1 px-space-sm py-space-md space-y-space-md">
+        <!-- Overview Group -->
+        <div class="space-y-space-2xs">
+          <span class="px-space-sm font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Overview</span>
+          <div class="mt-space-2xs space-y-space-2xs">
+            <a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg transition-colors bg-primary-container text-on-primary font-semibold" data-path="dashboard" href="#">
+              <span class="material-symbols-outlined text-[18px]">grid_view</span>Dashboard
+            </a>
+          </div>
+        </div>
+
+        <!-- Alert Intelligence Group -->
+        <div class="space-y-space-2xs">
+          <span class="px-space-sm font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Alert Intelligence</span>
+          <div class="mt-space-2xs space-y-space-2xs">
+            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="live-alerts" href="#">
+              <span class="material-symbols-outlined text-[18px]">warning</span>Live Alerts
+            </a>
+            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="alert-groups" href="#">
+              <span class="material-symbols-outlined text-[18px]">layers</span>Alert Groups
+            </a>
+          </div>
+        </div>
+
+        <!-- Incidents Group -->
+        <div class="space-y-space-2xs">
+          <span class="px-space-sm font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Incidents</span>
+          <div class="mt-space-2xs space-y-space-2xs">
+            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="incident-details" href="#">
+              <span class="material-symbols-outlined text-[18px]">emergency_home</span>Incident Details
+            </a>
+          </div>
+        </div>
+
+        <!-- Quick Simulation Sandbox -->
+        <div class="space-y-space-2xs pt-2">
+          <span class="px-space-sm font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Simulation Tools</span>
+          <div class="mt-space-2xs space-y-space-2xs">
+            <button onclick="simulateSurge()" class="w-full text-left flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-error hover:bg-error-container/30 font-body-sm text-body-sm transition-colors">
+              <span class="material-symbols-outlined text-[18px]">bolt</span>Simulate Alert Surge
+            </button>
+            <button onclick="recalculateHashes()" class="w-full text-left flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-primary hover:bg-primary-fixed font-body-sm text-body-sm transition-colors">
+              <span class="material-symbols-outlined text-[18px]">auto_fix_high</span>Recalculate Hashes
+            </button>
+          </div>
+        </div>
+      </nav>
+    </div>
+
+    <!-- User & Health Status Footer -->
+    <div class="p-space-sm border-t border-surface-container-highest bg-surface-container-low shrink-0 space-y-space-sm">
+      <div class="p-space-sm rounded-lg bg-surface-container-lowest border border-surface-container-highest space-y-1">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100"></span>
+          <span class="font-label-sm text-label-sm text-on-surface font-medium">Buster Engine Active</span>
+        </div>
+        <div class="flex items-center justify-between text-on-surface-variant font-code-sm text-code-sm">
+          <span>Throughput:</span>
+          <span class="font-medium text-on-surface">14.2k eps</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-space-sm px-1">
+        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+        </div>
+        <div class="flex flex-col min-w-0 flex-1">
+          <span class="font-label-md text-label-md text-on-surface font-medium truncate">Alex Rivera</span>
+          <span class="font-label-sm text-label-sm text-secondary truncate">Lead SRE</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Viewport Container -->
+  <div class="pl-64 min-h-screen flex flex-col">
+    <!-- Top Global Header -->
+    <header class="fixed top-0 left-64 right-0 h-14 bg-surface-container-lowest border-b border-surface-container-highest z-40 flex items-center justify-between px-space-base shadow-sm">
+      <div class="flex items-center gap-space-md">
+        <div class="flex items-center gap-space-xs font-label-md text-label-md text-secondary">
+          <span class="material-symbols-outlined text-[16px] cursor-pointer hover:text-primary" onclick="navigateTo('dashboard')">home</span>
+          <span>/</span>
+          <span class="text-on-surface font-medium" id="header-breadcrumb-root">Alert Fatigue Buster</span>
+        </div>
+        <!-- ⌘K Search Trigger Input -->
+        <div class="relative flex items-center w-80">
+          <span class="material-symbols-outlined absolute left-2.5 text-[18px] text-outline pointer-events-none">search</span>
+          <input id="global-search-input" class="w-full h-8 pl-8 pr-12 rounded-lg bg-surface-container-low border border-surface-container-highest text-on-surface placeholder:text-outline font-code-sm text-code-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all cursor-pointer" placeholder="Search telemetry... ⌘K" type="text" readonly/>
+          <span class="absolute right-2 px-1.5 py-0.5 rounded bg-surface-container font-code-sm text-[10px] text-on-surface-variant font-medium border border-surface-container-highest">⌘K</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-space-sm">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors">
+          <span class="w-2 h-2 rounded-full bg-primary"></span>
+          <span class="font-label-md text-label-md text-on-surface font-medium">Production-US-East</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors">
+          <span class="material-symbols-outlined text-[16px] text-outline">schedule</span>
+          <span class="font-label-md text-label-md text-on-surface font-medium">Last 1 hour</span>
+        </div>
+        <div class="h-4 w-px bg-surface-container-highest mx-0.5"></div>
+        <button onclick="navigateTo('live-alerts')" class="relative w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container transition-colors text-on-surface-variant" title="Active Critical Alerts">
+          <span class="material-symbols-outlined text-[20px]">notifications</span>
+          <span class="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-error text-on-error font-code-sm text-[10px] font-bold flex items-center justify-center">2</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Switcher Container -->
+    <main class="relative pt-14 w-full flex-1 bg-background p-space-base">
+      
+      <!-- ========================================== -->
+      <!-- VIEW 1: OPERATIONS OVERVIEW (DASHBOARD)     -->
+      <!-- ========================================== -->
+      <section id="view-dashboard" class="view-section active-view flex flex-col w-full space-y-space-lg">
+        <!-- Control Deck Banner -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+          <div class="flex flex-col gap-1 min-w-0">
+            <div class="flex items-center gap-space-sm flex-wrap">
+              <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">Operations Overview</h1>
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-low">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                <span class="font-code-sm text-code-sm font-semibold uppercase tracking-wider text-primary">STREAM ACTIVE</span>
+              </div>
+              <span class="font-code-sm text-code-sm text-secondary bg-surface-container px-2 py-0.5 rounded">CLUSTER: us-east-prod-k8s</span>
+            </div>
+            <p class="font-body-md text-body-md text-on-surface-variant">Real-time alert intelligence, suppression topology, and incident health</p>
+          </div>
+          <div class="flex items-center gap-space-sm shrink-0 flex-wrap">
+            <!-- Auto-Refresh Toggle -->
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-low shadow-sm">
+              <span class="font-code-sm text-code-sm text-secondary">Auto-refresh</span>
+              <button class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full bg-primary transition-colors duration-200 ease-in-out focus:outline-none" id="stream-toggle" onclick="toggleAutoRefresh()">
+                <span class="translate-x-4 inline-block h-4 w-4 transform rounded-full bg-on-primary transition duration-200 ease-in-out mt-0.5 ml-0.5" id="stream-thumb"></span>
+              </button>
+              <span class="font-code-sm text-[10px] font-bold text-primary bg-primary-fixed px-1.5 py-0.2 rounded" id="countdown-tag">2s</span>
+            </div>
+            <!-- Export Button -->
+            <button onclick="exportTelemetry()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-container-low text-on-surface font-label-md text-label-md hover:bg-surface-container transition-all shadow-sm">
+              <span class="material-symbols-outlined text-[18px] text-secondary">ios_share</span>
+              <span>Export Telemetry</span>
+            </button>
+            <!-- Primary Action -->
+            <button onclick="openNewIncidentModal()" class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md shadow-md hover:opacity-95 transition-all">
+              <span class="material-symbols-outlined text-[18px]">add_alert</span>
+              <span>+ New Incident</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Grid (6 Crisp Metrics) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-space-md">
+          <!-- Card 1: Incoming Alerts -->
+          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Incoming Alerts</span>
+              <span class="material-symbols-outlined text-[18px] text-primary">sensors</span>
+            </div>
+            <div class="my-2">
+              <div class="flex items-baseline gap-2">
+                <span class="font-headline-lg text-headline-lg text-on-surface tracking-tight" id="val-incoming">2,481</span>
+                <span class="font-code-sm text-code-sm text-error font-medium">+18.4%</span>
+              </div>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">vs last hr (avg 2,095)</span>
+            </div>
+            <div class="w-full h-8 pt-1">
+              <svg class="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 24">
+                <path class="text-error" d="M0,18 L15,16 L30,19 L45,12 L60,15 L75,7 L85,2 L100,20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                <circle class="fill-error" cx="85" cy="2" r="3"></circle>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Card 2: Actionable Alerts -->
+          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Actionable Alerts</span>
+              <span class="material-symbols-outlined text-[18px] text-tertiary">bolt</span>
+            </div>
+            <div class="my-2">
+              <div class="flex items-baseline gap-2">
+                <span class="font-headline-lg text-headline-lg text-on-surface tracking-tight text-primary font-bold" id="val-actionable">37</span>
+                <span class="font-code-sm text-code-sm text-primary font-medium">-42.1%</span>
+              </div>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">Clean operator signal</span>
+            </div>
+            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-secondary-container text-on-secondary-fixed font-code-sm text-code-sm font-medium">
+              <span class="material-symbols-outlined text-[14px]">send</span>
+              <span>Active Dispatch</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Noise Reduction -->
+          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Noise Reduction</span>
+              <span class="material-symbols-outlined text-[18px] text-primary">tune</span>
+            </div>
+            <div class="my-2">
+              <div class="flex items-baseline gap-2">
+                <span class="font-headline-lg text-headline-lg text-on-surface tracking-tight text-emerald-600 font-bold">98.5%</span>
+                <span class="font-code-sm text-code-sm text-emerald-600 font-semibold">↑ 3.2%</span>
+              </div>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">Fatigue eliminated</span>
+            </div>
+            <div class="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-50 text-emerald-800 font-code-sm text-code-sm font-semibold">
+              <span class="material-symbols-outlined text-[14px]">verified</span>
+              <span>NOISE CLEARED</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Active Incidents -->
+          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer" onclick="navigateTo('incident-details')">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Active Incidents</span>
+              <span class="material-symbols-outlined text-[18px] text-error">emergency</span>
+            </div>
+            <div class="my-2">
+              <div class="flex items-baseline gap-2">
+                <span class="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">2</span>
+                <span class="font-code-sm text-code-sm text-error font-medium">1 Crit · 1 Hi</span>
+              </div>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">1 Mitigated</span>
+            </div>
+            <div class="flex w-full h-2 rounded-full overflow-hidden bg-surface-container gap-0.5">
+              <div class="bg-error w-1/2" title="1 Critical"></div>
+              <div class="bg-amber-500 w-1/2" title="1 High"></div>
+            </div>
+          </div>
+
+          <!-- Card 5: Critical Alerts -->
+          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer" onclick="navigateTo('live-alerts')">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Critical Alerts</span>
+              <span class="material-symbols-outlined text-[18px] text-error">priority_high</span>
+            </div>
+            <div class="my-2">
+              <div class="flex items-baseline gap-2">
+                <span class="font-headline-lg text-headline-lg text-error tracking-tight font-bold">2</span>
+                <span class="font-code-sm text-code-sm text-secondary">Unack: 0</span>
+              </div>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">SLA Paging Normal</span>
+            </div>
+            <div class="flex items-center justify-between font-code-sm text-code-sm text-secondary bg-surface-container-low px-2 py-1 rounded">
+              <span>Escalation:</span>
+              <span class="text-on-surface font-semibold">Tier 3 (L3 SRE)</span>
+            </div>
+          </div>
+
+          <!-- Card 6: Mean Time to Respond -->
+          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">MTTR (P95)</span>
+              <span class="material-symbols-outlined text-[18px] text-primary">timer</span>
+            </div>
+            <div class="my-2">
+              <div class="flex items-baseline gap-2">
+                <span class="font-headline-lg text-headline-lg text-on-surface tracking-tight">4m 12s</span>
+                <span class="font-code-sm text-code-sm text-primary font-medium">-48s</span>
+              </div>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">Target SLA: &lt; 5m 00s</span>
+            </div>
+            <div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+              <div class="bg-primary h-full rounded-full" style="width: 84%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-time Ingestion Stream Chart & Flow -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+          <div class="lg:col-span-8 flex flex-col bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-base">
+              <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                  <span class="font-headline-sm text-headline-sm text-on-surface font-semibold">Alert Volume & Noise Reduction Stream</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded font-code-sm text-code-sm bg-tertiary-fixed text-on-tertiary-fixed font-semibold">Live Ingestion</span>
+                </div>
+                <span class="font-body-sm text-body-sm text-secondary">Comparing raw alert flood against Buster-filtered actionable output</span>
+              </div>
+              <div class="flex items-center gap-space-sm shrink-0">
+                <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-secondary">
+                  <span class="w-2.5 h-2.5 rounded-full bg-error"></span>
+                  <span>Raw Ingestion (2,481)</span>
+                </div>
+                <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-secondary">
+                  <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+                  <span>Actionable (37)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ingestion Pipeline Stages Flow -->
+            <div class="flex items-center justify-between gap-1 p-2 bg-surface-container-low rounded-xl mb-space-base overflow-x-auto">
+              <div class="flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest rounded-lg shadow-sm shrink-0">
+                <span class="material-symbols-outlined text-[16px] text-error">cloud_download</span>
+                <span class="font-code-sm text-code-sm font-semibold text-on-surface">1. Ingestion</span>
+                <span class="font-code-sm text-[10px] text-secondary">2.48k/m</span>
+              </div>
+              <span class="material-symbols-outlined text-[16px] text-outline shrink-0">arrow_forward</span>
+              <div class="flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest rounded-lg shadow-sm shrink-0">
+                <span class="material-symbols-outlined text-[16px] text-primary">filter_alt</span>
+                <span class="font-code-sm text-code-sm font-semibold text-on-surface">2. Deduplicate</span>
+                <span class="font-code-sm text-[10px] text-primary">-74.2%</span>
+              </div>
+              <span class="material-symbols-outlined text-[16px] text-outline shrink-0">arrow_forward</span>
+              <div class="flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest rounded-lg shadow-sm shrink-0">
+                <span class="material-symbols-outlined text-[16px] text-tertiary">ac_unit</span>
+                <span class="font-code-sm text-code-sm font-semibold text-on-surface">3. Cooldown</span>
+                <span class="font-code-sm text-[10px] text-secondary">15s win</span>
+              </div>
+              <span class="material-symbols-outlined text-[16px] text-outline shrink-0">arrow_forward</span>
+              <div class="flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest rounded-lg shadow-sm shrink-0">
+                <span class="material-symbols-outlined text-[16px] text-primary">hub</span>
+                <span class="font-code-sm text-code-sm font-semibold text-on-surface">4. Correlate</span>
+                <span class="font-code-sm text-[10px] text-primary">4 clusters</span>
+              </div>
+              <span class="material-symbols-outlined text-[16px] text-outline shrink-0">arrow_forward</span>
+              <div class="flex items-center gap-1.5 px-3 py-1 bg-primary rounded-lg shadow-sm shrink-0 text-on-primary">
+                <span class="material-symbols-outlined text-[16px]">alt_route</span>
+                <span class="font-code-sm text-code-sm font-bold">5. Smart Route</span>
+                <span class="font-code-sm text-[10px] bg-primary-container px-1 rounded">37 alerts</span>
+              </div>
+            </div>
+
+            <!-- Visualization Canvas -->
+            <div class="relative w-full h-64 bg-surface-container-low rounded-xl p-3 flex flex-col justify-end overflow-hidden">
+              <svg class="w-full h-52 z-10 overflow-visible" preserveAspectRatio="none" viewBox="0 0 600 200">
+                <defs>
+                  <linearGradient id="rawGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="#ba1a1a" stop-opacity="0.35"></stop>
+                    <stop offset="100%" stop-color="#ba1a1a" stop-opacity="0.0"></stop>
+                  </linearGradient>
+                  <linearGradient id="actionGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="#3525cd" stop-opacity="0.4"></stop>
+                    <stop offset="100%" stop-color="#3525cd" stop-opacity="0.02"></stop>
+                  </linearGradient>
+                </defs>
+                <path d="M 0,185 L 50,182 L 100,180 L 150,175 L 200,165 L 250,160 L 300,150 L 350,130 L 400,20 L 430,75 L 480,120 L 530,165 L 600,170 L 600,200 L 0,200 Z" fill="url(#rawGrad)"></path>
+                <path d="M 0,185 L 50,182 L 100,180 L 150,175 L 200,165 L 250,160 L 300,150 L 350,130 L 400,20 L 430,75 L 480,120 L 530,165 L 600,170" fill="none" stroke="#ba1a1a" stroke-linecap="round" stroke-width="2.5"></path>
+                <path d="M 0,195 L 80,194 L 160,194 L 240,193 L 320,193 L 400,190 L 480,191 L 540,192 L 600,193 L 600,200 L 0,200 Z" fill="url(#actionGrad)"></path>
+                <path d="M 0,195 L 80,194 L 160,194 L 240,193 L 320,193 L 400,190 L 480,191 L 540,192 L 600,193" fill="none" stroke="#3525cd" stroke-linecap="round" stroke-width="3"></path>
+                <circle class="fill-error stroke-surface-container-lowest" cx="400" cy="20" r="5" stroke-width="2"></circle>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Right Column: Active Incident Quick Triage Panel (4 Cols) -->
+          <div class="lg:col-span-4 flex flex-col bg-surface-container-lowest p-space-lg rounded-xl shadow-sm gap-space-md">
+            <div class="flex items-center justify-between border-b border-surface-container-highest pb-space-sm">
+              <span class="font-headline-sm text-headline-sm text-on-surface font-semibold">Active Incidents</span>
+              <button onclick="navigateTo('incident-details')" class="font-label-sm text-label-sm text-primary hover:underline">View All →</button>
+            </div>
+            <div id="incidents-quick-list" class="flex flex-col gap-space-sm">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="pt-2 border-t border-surface-container-highest">
+              <button onclick="openNewIncidentModal()" class="w-full py-2 px-3 rounded-lg border border-dashed border-outline-variant hover:border-primary text-primary font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">add</span>
+                <span>Declare SRE Incident</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 2: LIVE ALERTS STREAM                 -->
+      <!-- ========================================== -->
+      <section id="view-live-alerts" class="view-section flex flex-col w-full space-y-space-md">
+        <!-- Velocity Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter-compact">
+          <div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex items-center justify-between">
+            <div class="flex flex-col">
+              <span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Ingress Velocity</span>
+              <div class="flex items-baseline gap-space-xs mt-0.5">
+                <span class="font-headline-lg text-headline-lg text-on-surface font-bold" id="val-ingress-velocity">142.8</span>
+                <span class="font-code-sm text-code-sm text-primary font-medium">alerts/sec</span>
+              </div>
+            </div>
+            <div class="w-16 h-8 text-primary">
+              <span class="material-symbols-outlined text-[32px]">speed</span>
+            </div>
+          </div>
+
+          <div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex items-center justify-between">
+            <div class="flex flex-col">
+              <span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Fatigue Absorption</span>
+              <div class="flex items-baseline gap-space-xs mt-0.5">
+                <span class="font-headline-lg text-headline-lg text-on-surface font-bold" id="val-fatigue-absorb">91.4%</span>
+                <span class="font-label-sm text-label-sm text-secondary">suppressed</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded">
+              <span class="material-symbols-outlined text-[16px] text-tertiary">filter_alt_off</span>
+              <span class="font-code-sm text-code-sm font-semibold text-tertiary">2,267 dropped</span>
+            </div>
+          </div>
+
+          <div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex items-center justify-between">
+            <div class="flex flex-col">
+              <span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Decision Latency</span>
+              <div class="flex items-baseline gap-space-xs mt-0.5">
+                <span class="font-headline-lg text-headline-lg text-on-surface font-bold">11.8</span>
+                <span class="font-code-sm text-code-sm text-secondary font-medium">ms p99</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-surface-tint animate-ping"></span>
+              <span class="font-label-sm text-label-sm text-primary font-medium">Zero Backpressure</span>
+            </div>
+          </div>
+
+          <div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex items-center justify-between">
+            <div class="flex flex-col">
+              <span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Active Dedupe Pool</span>
+              <div class="flex items-baseline gap-space-xs mt-0.5">
+                <span class="font-headline-lg text-headline-lg text-on-surface font-bold" id="val-dedupe-pool">63</span>
+                <span class="font-code-sm text-code-sm text-secondary font-medium">fingerprints</span>
+              </div>
+            </div>
+            <span class="font-code-sm text-code-sm px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-medium">LRU: 94% Free</span>
+          </div>
+        </div>
+
+        <!-- Live Alerts Table Header & Controls -->
+        <div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+          <div class="flex flex-col gap-0.5">
+            <div class="flex items-center gap-space-sm">
+              <h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">Live Alerts Stream</h2>
+              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold">
+                <span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+                <span>Ingress Active</span>
+              </div>
+            </div>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">Real-time telemetry event deduplication stream</p>
+          </div>
+          <div class="flex items-center gap-space-sm flex-wrap">
+            <button onclick="simulateSurge()" class="px-3 py-1.5 rounded-lg bg-error-container text-on-error-container font-label-md text-label-md hover:bg-error/20 transition-colors flex items-center gap-1">
+              <span class="material-symbols-outlined text-[16px]">bolt</span>
+              <span>Trigger Surge</span>
+            </button>
+            <button onclick="exportTelemetry()" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors flex items-center gap-1">
+              <span class="material-symbols-outlined text-[16px]">download</span>
+              <span>Export</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Stream Table -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-surface-container-low text-secondary font-label-sm text-[11px] uppercase tracking-wider border-b border-surface-container-highest">
+                <th class="py-2.5 px-3">Timestamp</th>
+                <th class="py-2.5 px-3">Severity</th>
+                <th class="py-2.5 px-3">Alert Title & Details</th>
+                <th class="py-2.5 px-3">Service</th>
+                <th class="py-2.5 px-3">Count</th>
+                <th class="py-2.5 px-3">Buster State</th>
+                <th class="py-2.5 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="live-alerts-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 3: ALERT GROUPS & DEDUPLICATION       -->
+      <!-- ========================================== -->
+      <section id="view-alert-groups" class="view-section flex flex-col w-full gap-space-lg">
+        <div class="relative w-full rounded-xl bg-surface-container-lowest p-space-base shadow-sm overflow-hidden">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm pb-space-xs">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-code-sm text-code-sm font-semibold tracking-wide uppercase">Algorithmic Triage Engine</span>
+                <span class="flex items-center gap-1 font-code-sm text-code-sm text-outline">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Live Pipeline Active
+                </span>
+              </div>
+              <h2 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">Alert Groups & Deduplication</h2>
+              <p class="font-body-sm text-body-sm text-on-surface-variant max-w-2xl">
+                Dynamic fingerprint grouping and noise suppression clusters within sliding temporal windows. Mitigating cognitive fatigue before human escalation.
+              </p>
+            </div>
+            <div class="flex items-center gap-space-sm self-start md:self-auto">
+              <button onclick="recalculateHashes()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md transition-colors shadow-sm">
+                <span class="material-symbols-outlined text-[16px]">auto_fix_high</span>
+                <span>Recalculate Hashes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert Groups Cards List -->
+        <div id="alert-groups-list" class="flex flex-col gap-space-md">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 4: INCIDENT DETAILS & RUNBOOKS        -->
+      <!-- ========================================== -->
+      <section id="view-incident-details" class="view-section flex flex-col w-full gap-space-lg">
+        <!-- Incident Control Banner -->
+        <div class="relative bg-surface-container-lowest rounded-xl p-space-base shadow-sm overflow-hidden flex flex-col gap-space-md">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md relative z-10">
+            <div class="flex flex-col gap-space-2xs">
+              <div class="flex flex-wrap items-center gap-space-sm">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-code-sm text-code-sm font-semibold uppercase tracking-wider">
+                  <span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+                  Critical Severity
+                </span>
+                <span class="font-code-md text-code-md text-secondary font-semibold">INC-1042</span>
+                <span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+                <span class="inline-flex items-center gap-1 text-on-surface-variant font-body-sm text-body-sm">
+                  <span class="material-symbols-outlined text-[15px] text-tertiary">hub</span>
+                  Root Cause Triaged
+                </span>
+              </div>
+              <h1 id="incident-details-title" class="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">
+                INC-1042: Database Connection Cascade
+              </h1>
+              <p id="incident-details-desc" class="font-body-md text-body-md text-on-surface-variant max-w-4xl">
+                Cascading connection pool failure on postgres-primary impacting downstream checkout and payment authorization services.
+              </p>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button onclick="showToast('Runbook automated steps loaded', 'info')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors">
+                <span class="material-symbols-outlined text-[17px] text-secondary">assignment_turned_in</span>
+                <span>Runbook</span>
+              </button>
+              <button onclick="showToast('War room session active on Slack / Zoom', 'success')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md shadow-sm hover:opacity-95 transition-all">
+                <span class="material-symbols-outlined text-[17px]">video_call</span>
+                <span>Join War Room</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Metadata Ribbon -->
+          <div class="flex flex-wrap items-center gap-x-space-lg gap-y-space-xs pt-space-xs text-on-surface-variant font-label-sm text-label-sm bg-surface-container-low/70 px-space-base py-space-xs rounded-lg">
+            <div class="flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-secondary">schedule</span>
+              <span class="text-secondary">Started:</span>
+              <span class="font-code-sm text-code-sm text-on-surface font-medium">14:32:08 UTC</span>
+              <span class="text-error font-medium">(18m ago)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-primary">radio_button_checked</span>
+              <span class="text-secondary">Status:</span>
+              <span class="font-medium text-primary uppercase">Investigating</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-secondary">account_circle</span>
+              <span class="text-secondary">Lead:</span>
+              <span id="incident-owner" class="font-medium text-on-surface">Alex Rivera (Lead SRE)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-secondary">lan</span>
+              <span class="text-secondary">Lead Service:</span>
+              <span id="incident-lead-service" class="font-code-sm text-code-sm text-primary font-semibold">payment-gateway</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3-Column SRE Analysis Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-md">
+          <!-- Col 1: Correlated Alerts (4 cols) -->
+          <div class="lg:col-span-4 bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-3">
+            <div class="flex items-center justify-between border-b border-surface-container-highest pb-2">
+              <span class="font-headline-sm text-[16px] font-semibold text-on-surface">Correlated Alerts (429)</span>
+              <span class="font-code-sm text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">1 Actionable</span>
+            </div>
+            <div class="space-y-2 font-code-sm text-code-sm">
+              <div class="p-2.5 rounded-lg bg-error-container/30 border border-error/20">
+                <div class="flex items-center justify-between text-error font-bold">
+                  <span>ALT-9042 (Lead Cause)</span>
+                  <span>14:32:08</span>
+                </div>
+                <div class="font-semibold text-on-surface mt-1">PostgresConnectionPoolExhausted</div>
+                <div class="text-on-surface-variant text-[11px]">payment-gateway · pool util 98.4%</div>
+              </div>
+              <div class="p-2.5 rounded-lg bg-surface-container-low border border-surface-container-highest">
+                <div class="flex items-center justify-between text-secondary font-medium">
+                  <span>ALT-9041 (Cascaded)</span>
+                  <span>14:32:12</span>
+                </div>
+                <div class="font-medium text-on-surface mt-1">HTTP5xxRateSpike (checkout-api)</div>
+                <div class="text-on-surface-variant text-[11px]">89 alerts batched under lead cause</div>
+              </div>
+              <div class="p-2.5 rounded-lg bg-surface-container-low border border-surface-container-highest">
+                <div class="flex items-center justify-between text-secondary font-medium">
+                  <span>ALT-9038 (Upstream)</span>
+                  <span>14:32:44</span>
+                </div>
+                <div class="font-medium text-on-surface mt-1">UpstreamTimedOut (ingress-nginx)</div>
+                <div class="text-on-surface-variant text-[11px]">198 alerts batched under lead cause</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 2: Telemetry Graphs & Root Cause (5 cols) -->
+          <div class="lg:col-span-5 bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-3">
+            <div class="flex items-center justify-between border-b border-surface-container-highest pb-2">
+              <span class="font-headline-sm text-[16px] font-semibold text-on-surface">Telemetry Root Cause Graph</span>
+              <span class="font-code-sm text-[11px] text-secondary">Postgres Pooler Metrics</span>
+            </div>
+            <div class="p-3 bg-surface-container-low rounded-xl">
+              <div class="flex items-center justify-between text-on-surface font-code-sm text-code-sm mb-2">
+                <span>Active DB Connections:</span>
+                <span class="font-bold text-error">982 / 1000 (98.2%)</span>
+              </div>
+              <div class="w-full h-3 bg-surface-container rounded-full overflow-hidden mb-3">
+                <div class="bg-error h-full rounded-full" style="width: 98%;"></div>
+              </div>
+              <div class="text-on-surface-variant font-body-sm text-[12px] bg-surface-container-lowest p-2 rounded-lg border border-surface-container-highest">
+                💡 <strong>Root Cause Analysis:</strong> Database connection pool exhausted after worker thread leak during slow queries on order status table.
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 3: SRE Runbook Action Steps (3 cols) -->
+          <div class="lg:col-span-3 bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-3">
+            <div class="flex items-center justify-between border-b border-surface-container-highest pb-2">
+              <span class="font-headline-sm text-[16px] font-semibold text-on-surface">Interactive Runbook</span>
+              <span class="font-code-sm text-[11px] text-primary">Step 3 of 5</span>
+            </div>
+            <div class="space-y-2 font-body-sm text-body-sm">
+              <div class="flex items-center gap-2 text-emerald-700 font-medium">
+                <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                <span>1. Verify Pool Utilization</span>
+              </div>
+              <div class="flex items-center gap-2 text-emerald-700 font-medium">
+                <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                <span>2. Drain Deadlock Connections</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-primary-fixed border border-primary/20 space-y-2">
+                <div class="flex items-center gap-2 font-bold text-primary">
+                  <span class="material-symbols-outlined text-[18px]">play_circle</span>
+                  <span>3. Scale PgBouncer Poolers</span>
+                </div>
+                <button onclick="showToast('Scaled PgBouncer replicas: 8 → 16', 'success')" class="w-full py-1.5 rounded bg-primary text-on-primary font-label-sm text-label-sm font-semibold hover:bg-primary-container transition-colors">
+                  Execute Scale Action
+                </button>
+              </div>
+              <div class="flex items-center gap-2 text-secondary">
+                <span class="material-symbols-outlined text-[18px]">radio_button_unchecked</span>
+                <span>4. Monitor Checkout 502 Recovery</span>
+              </div>
+              <div class="flex items-center gap-2 text-secondary">
+                <span class="material-symbols-outlined text-[18px]">radio_button_unchecked</span>
+                <span>5. Post-Incident Review</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 1: NEW INCIDENT CREATION DIALOG      -->
+  <!-- ========================================== -->
+  <div id="new-incident-modal" class="modal-overlay">
+    <div class="bg-surface-container-lowest border border-surface-container-highest rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-surface-container-highest pb-3">
+        <h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Declare SRE Incident</h3>
+        <button onclick="closeNewIncidentModal()" class="text-outline hover:text-on-surface">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+      <form id="new-incident-form" class="space-y-4 font-body-md text-body-md">
+        <div>
+          <label class="block font-label-md text-label-md text-secondary mb-1">Incident Title</label>
+          <input id="modal-inc-title" type="text" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-surface-container-highest text-on-surface font-body-md focus:outline-none focus:border-primary" placeholder="e.g. Ingress Gateway Latency Degradation" required/>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-label-md text-label-md text-secondary mb-1">Severity</label>
+            <select id="modal-inc-severity" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-surface-container-highest text-on-surface font-body-md focus:outline-none focus:border-primary">
+              <option value="CRITICAL">P0 - Critical</option>
+              <option value="HIGH" selected>P1 - High</option>
+              <option value="MEDIUM">P2 - Medium</option>
+              <option value="LOW">P3 - Low</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-label-md text-label-md text-secondary mb-1">Lead Service</label>
+            <input id="modal-inc-service" type="text" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-surface-container-highest text-on-surface font-body-md focus:outline-none focus:border-primary" placeholder="e.g. payment-gateway" required/>
+          </div>
+        </div>
+        <div>
+          <label class="block font-label-md text-label-md text-secondary mb-1">Description & Impact</label>
+          <textarea id="modal-inc-desc" rows="3" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-surface-container-highest text-on-surface font-body-md focus:outline-none focus:border-primary" placeholder="Details regarding telemetry symptoms, affected customer endpoints, and initial logs..."></textarea>
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-container-highest">
+          <button type="button" onclick="closeNewIncidentModal()" class="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md font-semibold hover:bg-primary-container shadow-md transition-colors">
+            Create Incident
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 2: ⌘K SEARCH MODAL                   -->
+  <!-- ========================================== -->
+  <div id="search-modal" class="modal-overlay">
+    <div class="bg-surface-container-lowest border border-surface-container-highest rounded-2xl w-full max-w-xl p-4 shadow-2xl space-y-3">
+      <div class="relative flex items-center border-b border-surface-container-highest pb-3">
+        <span class="material-symbols-outlined text-[20px] text-outline mr-2">search</span>
+        <input id="modal-search-input" type="text" class="w-full bg-transparent text-on-surface placeholder:text-outline font-body-md text-[15px] focus:outline-none" placeholder="Search alerts, incidents, fingerprints, runbooks..."/>
+        <button onclick="closeSearchModal()" class="text-outline hover:text-on-surface px-1.5 py-0.5 rounded bg-surface-container font-code-sm text-[10px]">
+          ESC
+        </button>
+      </div>
+      <div id="modal-search-results" class="max-h-72 overflow-y-auto space-y-1">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Core JavaScript Bundles -->
+  <script src="js/mockData.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
