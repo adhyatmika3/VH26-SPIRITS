@@ -109,14 +109,15 @@
 
 /* View transitions */
 .view-section {
-  display: none;
+  display: none !important;
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .view-section.active-view {
-  display: block;
+  display: flex !important;
+  flex-direction: column !important;
   opacity: 1;
   transform: translateY(0);
 }

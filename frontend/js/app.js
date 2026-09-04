@@ -22,6 +22,11 @@
   function init() {
     cacheElements();
     bindEvents();
+    
+    // Check initial route from hash
+    const initialRoute = normalizePath(window.location.hash || 'dashboard');
+    navigateTo(initialRoute, false);
+
     fetchAllRealData();
     startAutoRefresh();
     setupShortcutKeys();
@@ -48,14 +53,47 @@
     };
   }
 
+  function normalizePath(raw) {
+    if (!raw) return 'dashboard';
+    const clean = raw.replace(/^#\/?/, '').trim().toLowerCase();
+    const map = {
+      '': 'dashboard',
+      'dashboard': 'dashboard',
+      'overview': 'dashboard',
+      'live-alerts': 'live-alerts',
+      'alerts': 'live-alerts',
+      'explorer': 'live-alerts',
+      'alert-explorer': 'live-alerts',
+      'alert-groups': 'alert-groups',
+      'groups': 'alert-groups',
+      'correlated-groups': 'alert-groups',
+      'clusters': 'alert-groups',
+      'incident-details': 'incident-details',
+      'incidents': 'incident-details',
+      'timeline': 'incident-details',
+      'active-incidents': 'incident-details',
+      'analytics': 'analytics',
+      'impact': 'analytics'
+    };
+    return map[clean] || 'dashboard';
+  }
+
   function bindEvents() {
     // Navigation routing
     elements.navLinks.forEach((link) => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const path = link.getAttribute('data-path');
-        navigateTo(path);
+        navigateTo(path, true);
       });
+    });
+
+    // Hash change listener for browser navigation (back/forward, direct URL)
+    window.addEventListener('hashchange', () => {
+      const target = normalizePath(window.location.hash);
+      if (target !== state.currentView) {
+        navigateTo(target, false);
+      }
     });
 
     // Global Search Inputs
@@ -77,13 +115,18 @@
   }
 
   // Navigation controller
-  window.navigateTo = function (path) {
-    state.currentView = path;
+  window.navigateTo = function (path, updateHash = true) {
+    const normPath = normalizePath(path);
+    state.currentView = normPath;
+
+    if (updateHash) {
+      window.location.hash = `#${normPath}`;
+    }
 
     // Update active nav styling
     elements.navLinks.forEach((link) => {
-      const linkPath = link.getAttribute('data-path');
-      if (linkPath === path) {
+      const linkPath = normalizePath(link.getAttribute('data-path'));
+      if (linkPath === normPath) {
         link.className =
           'flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg transition-colors bg-primary-container text-on-primary font-semibold';
       } else {
@@ -92,23 +135,25 @@
       }
     });
 
-    // Toggle view sections
+    // Toggle view sections with both class and hidden attribute
     elements.viewSections.forEach((section) => {
-      if (section.id === `view-${path}`) {
+      if (section.id === `view-${normPath}`) {
+        section.classList.remove('hidden');
         section.classList.add('active-view');
       } else {
+        section.classList.add('hidden');
         section.classList.remove('active-view');
       }
     });
 
     // Specific view re-renders
-    if (path === 'dashboard' || path === 'overview') {
+    if (normPath === 'dashboard') {
       renderDashboardOverview();
-    } else if (path === 'live-alerts') {
+    } else if (normPath === 'live-alerts') {
       renderLiveAlerts();
-    } else if (path === 'alert-groups') {
+    } else if (normPath === 'alert-groups') {
       renderAlertGroups();
-    } else if (path === 'active-incidents' || path === 'incident-details') {
+    } else if (normPath === 'incident-details') {
       if (state.selectedIncidentId) {
         renderSelectedIncident(state.selectedIncidentId);
       } else if (state.incidents.length > 0) {
@@ -116,11 +161,11 @@
       } else {
         renderEmptyIncidentDetail();
       }
-    } else if (path === 'analytics') {
+    } else if (normPath === 'analytics') {
       renderAnalytics();
     }
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   // Fetch all real data from backend endpoints

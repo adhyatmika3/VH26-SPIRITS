@@ -132,7 +132,7 @@
         <div class="space-y-space-2xs">
           <span class="px-space-sm font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Overview</span>
           <div class="mt-space-2xs space-y-space-2xs">
-            <a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg transition-colors bg-primary-container text-on-primary font-semibold" data-path="dashboard" href="#">
+            <a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg transition-colors bg-primary-container text-on-primary font-semibold" data-path="dashboard" href="#dashboard">
               <span class="material-symbols-outlined text-[18px]">grid_view</span>Dashboard
             </a>
           </div>
@@ -142,10 +142,10 @@
         <div class="space-y-space-2xs">
           <span class="px-space-sm font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Alert Intelligence</span>
           <div class="mt-space-2xs space-y-space-2xs">
-            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="live-alerts" href="#">
+            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="live-alerts" href="#live-alerts">
               <span class="material-symbols-outlined text-[18px]">warning</span>Alert Explorer
             </a>
-            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="alert-groups" href="#">
+            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="alert-groups" href="#alert-groups">
               <span class="material-symbols-outlined text-[18px]">layers</span>Correlated Groups
             </a>
           </div>
@@ -155,10 +155,10 @@
         <div class="space-y-space-2xs">
           <span class="px-space-sm font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Triage & Analysis</span>
           <div class="mt-space-2xs space-y-space-2xs">
-            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="incident-details" href="#">
+            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="incident-details" href="#incident-details">
               <span class="material-symbols-outlined text-[18px]">timeline</span>Incidents & Timeline
             </a>
-            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="analytics" href="#">
+            <a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors" data-path="analytics" href="#analytics">
               <span class="material-symbols-outlined text-[18px]">insights</span>Analytics & Impact
             </a>
           </div>
@@ -398,7 +398,7 @@
       <!-- ========================================== -->
       <!-- VIEW 2: LIVE ALERTS STREAM                 -->
       <!-- ========================================== -->
-      <section id="view-live-alerts" class="view-section flex flex-col w-full space-y-space-md">
+      <section id="view-live-alerts" class="view-section hidden flex flex-col w-full space-y-space-md">
         <!-- Live Alerts Table Header -->
         <div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-md">
           <div class="flex flex-col gap-0.5">
@@ -437,7 +437,7 @@
       <!-- ========================================== -->
       <!-- VIEW 3: ALERT GROUPS & DEDUPLICATION       -->
       <!-- ========================================== -->
-      <section id="view-alert-groups" class="view-section flex flex-col w-full gap-space-lg">
+      <section id="view-alert-groups" class="view-section hidden flex flex-col w-full gap-space-lg">
         <div class="relative w-full rounded-xl bg-surface-container-lowest p-space-base shadow-sm overflow-hidden">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm pb-space-xs">
             <div class="space-y-1">
@@ -471,7 +471,7 @@
       <!-- ========================================== -->
       <!-- VIEW 4: INCIDENT DETAILS & RUNBOOKS        -->
       <!-- ========================================== -->
-      <section id="view-incident-details" class="view-section flex flex-col w-full gap-space-lg">
+      <section id="view-incident-details" class="view-section hidden flex flex-col w-full gap-space-lg">
         <!-- Incident Control Banner -->
         <div class="relative bg-surface-container-lowest rounded-xl p-space-base shadow-sm overflow-hidden flex flex-col gap-space-md">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md relative z-10">
@@ -599,7 +599,7 @@
       <!-- ========================================== -->
       <!-- VIEW 5: ANALYTICS & IMPACT (STEP 10)        -->
       <!-- ========================================== -->
-      <section id="view-analytics" class="view-section flex flex-col w-full space-y-space-lg">
+      <section id="view-analytics" class="view-section hidden flex flex-col w-full space-y-space-lg">
         <!-- Analytics Header Banner -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest">
           <div class="space-y-1">
