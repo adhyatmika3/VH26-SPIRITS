@@ -212,7 +212,7 @@
 
     const hasData = data.has_sufficient_data;
 
-    // Top Metric Cards
+    // Top 4 Real-Data KPI Cards
     if (elements.valIncoming) {
       elements.valIncoming.innerText = hasData ? data.total_alerts.toLocaleString() : '0';
     }
@@ -226,62 +226,25 @@
     const elemGrouped = document.getElementById('val-grouped-count');
     if (elemGrouped) elemGrouped.innerText = hasData ? data.related_alerts_grouped.toLocaleString() : '0';
 
-    const elemSuppressed = document.getElementById('val-suppressed-count');
-    if (elemSuppressed) elemSuppressed.innerText = hasData ? data.suppressed_alerts.toLocaleString() : '0';
-
     const elemNoisePct = document.getElementById('val-noise-reduction-pct');
     if (elemNoisePct) {
       elemNoisePct.innerText = hasData && data.total_alerts > 0 
-        ? `${data.noise_reduction_rate.toFixed(1)}% noise eliminated`
-        : 'Awaiting alert data';
+        ? `(${data.noise_reduction_rate.toFixed(1)}% eliminated)`
+        : '0% reduced';
     }
 
     // Pipeline Flow Ribbon
     const flowRecv = document.getElementById('flow-val-received');
-    if (flowRecv) flowRecv.innerText = hasData ? data.total_alerts.toLocaleString() : '0';
+    if (flowRecv) flowRecv.innerText = hasData ? `${data.total_alerts.toLocaleString()} alerts` : '0 alerts';
 
     const flowDedup = document.getElementById('flow-val-dedup');
-    if (flowDedup) flowDedup.innerText = hasData ? data.repeated_alert_occurrences.toLocaleString() : '0';
+    if (flowDedup) flowDedup.innerText = hasData ? `${data.repeated_alert_occurrences.toLocaleString()} repeats` : '0 repeats';
 
     const flowGrouped = document.getElementById('flow-val-grouped');
-    if (flowGrouped) flowGrouped.innerText = hasData ? data.related_alerts_grouped.toLocaleString() : '0';
-
-    const flowSuppressed = document.getElementById('flow-val-suppressed');
-    if (flowSuppressed) flowSuppressed.innerText = hasData ? data.suppressed_alerts.toLocaleString() : '0';
+    if (flowGrouped) flowGrouped.innerText = hasData ? `${data.related_alerts_grouped.toLocaleString()} grouped` : '0 grouped';
 
     const flowNotified = document.getElementById('flow-val-notified');
-    if (flowNotified) flowNotified.innerText = hasData ? data.notified_alerts.toLocaleString() : '0';
-
-    // Before vs After Card
-    const ba = data.before_after || {};
-    const beforeInt = document.getElementById('val-before-interruptions');
-    if (beforeInt) {
-      beforeInt.innerText = ba.has_sufficient_data ? `${ba.without_platform_interruptions.toLocaleString()} alerts` : 'Awaiting data';
-    }
-
-    const afterNotif = document.getElementById('val-after-notifications');
-    if (afterNotif) {
-      afterNotif.innerText = ba.has_sufficient_data ? `${ba.with_platform_notifications.toLocaleString()} notifications` : 'Awaiting data';
-    }
-
-    const afterMtta = document.getElementById('val-after-mtta');
-    if (afterMtta) {
-      afterMtta.innerText = data.mtta_seconds > 0 ? data.mtta_formatted : 'Awaiting data';
-    }
-
-    const afterRed = document.getElementById('val-after-reduction');
-    if (afterRed) {
-      afterRed.innerText = ba.has_sufficient_data && ba.noise_reduction_percent > 0 
-        ? `${ba.noise_reduction_percent.toFixed(1)}%` 
-        : 'Awaiting data';
-    }
-
-    const afterHrs = document.getElementById('val-after-hours');
-    if (afterHrs) {
-      afterHrs.innerText = ba.estimated_attention_avoided_hours > 0 
-        ? `~${ba.estimated_attention_avoided_hours} hrs` 
-        : 'Awaiting data';
-    }
+    if (flowNotified) flowNotified.innerText = hasData ? `${data.notified_alerts.toLocaleString()} dispatched` : '0 dispatched';
   }
 
   // Render Dashboard Overview Page
@@ -300,10 +263,10 @@
 
     if (state.alerts.length === 0) {
       container.innerHTML = `
-        <div class="p-6 text-center text-secondary border border-dashed border-surface-container-highest rounded-xl">
-          <span class="material-symbols-outlined text-[32px] text-outline mb-2">notifications_off</span>
-          <p class="font-body-md font-semibold text-on-surface">No alerts processed yet</p>
-          <p class="font-body-sm text-xs text-on-surface-variant mt-1">Send webhooks to /api/v1/alerts/webhook to ingest real alerts.</p>
+        <div class="p-8 text-center text-secondary border border-dashed border-surface-container-highest rounded-2xl">
+          <span class="material-symbols-outlined text-[36px] text-outline mb-2">notifications_off</span>
+          <p class="font-headline-sm text-sm font-semibold text-on-surface">No telemetry alerts ingested yet</p>
+          <p class="font-body-sm text-xs text-on-surface-variant mt-1 max-w-md mx-auto">The engine is connected to PostgreSQL and ready to process incoming webhook events.</p>
         </div>
       `;
       return;
@@ -313,7 +276,7 @@
     container.innerHTML = '';
     recent.forEach((alert) => {
       const item = document.createElement('div');
-      item.className = 'p-3 rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer border border-surface-container-highest flex items-center justify-between gap-3';
+      item.className = 'p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer border border-surface-container-highest flex items-center justify-between gap-3';
       
       const isSuppressed = alert.status === 'SUPPRESSED' || alert.is_duplicate;
       const statusBadge = isSuppressed
@@ -325,9 +288,9 @@
 
       item.innerHTML = `
         <div class="flex items-center gap-3 min-w-0 flex-1">
-          <span class="font-code-sm text-code-sm ${sevColor} shrink-0">${alert.severity || 'INFO'}</span>
+          <span class="font-code-sm text-xs ${sevColor} shrink-0">${alert.severity || 'INFO'}</span>
           <div class="min-w-0 flex-1">
-            <div class="font-label-md text-label-md font-semibold text-on-surface truncate">${alert.title || alert.alert_name || 'Alert'}</div>
+            <div class="font-label-md text-sm font-semibold text-on-surface truncate">${alert.title || alert.alert_name || 'Alert'}</div>
             <div class="font-code-sm text-[11px] text-on-surface-variant truncate">${alert.service || 'unknown-service'}</div>
           </div>
         </div>
@@ -352,10 +315,10 @@
 
     if (state.incidents.length === 0) {
       container.innerHTML = `
-        <div class="p-6 text-center text-secondary border border-dashed border-surface-container-highest rounded-xl">
-          <span class="material-symbols-outlined text-[32px] text-outline mb-2">check_circle</span>
-          <p class="font-body-md font-semibold text-on-surface">No active incidents</p>
-          <p class="font-body-sm text-xs text-on-surface-variant mt-1">System operational. No correlated incident clusters detected.</p>
+        <div class="p-8 text-center text-secondary border border-dashed border-surface-container-highest rounded-2xl">
+          <span class="material-symbols-outlined text-[36px] text-emerald-500 mb-2">check_circle</span>
+          <p class="font-headline-sm text-sm font-semibold text-on-surface">No active incidents</p>
+          <p class="font-body-sm text-xs text-on-surface-variant mt-1 max-w-md mx-auto">System operational. No correlated incident clusters detected.</p>
         </div>
       `;
       return;
@@ -365,20 +328,20 @@
     container.innerHTML = '';
     active.forEach((inc) => {
       const item = document.createElement('div');
-      item.className = 'p-3 rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer border border-surface-container-highest flex items-center justify-between gap-3';
+      item.className = 'p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer border border-surface-container-highest flex items-center justify-between gap-3';
 
       const statusColor = inc.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' : inc.status === 'ACKNOWLEDGED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800';
 
       item.innerHTML = `
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2 mb-1">
-            <span class="font-code-sm text-code-sm font-bold text-primary">${inc.incident_number || inc.id}</span>
+            <span class="font-code-sm text-xs font-bold text-primary">${inc.incident_number || inc.id}</span>
             <span class="px-2 py-0.5 rounded ${statusColor} font-code-sm text-[10px] font-bold">${inc.status}</span>
           </div>
-          <div class="font-label-md text-label-md font-semibold text-on-surface truncate">${inc.title}</div>
+          <div class="font-label-md text-sm font-semibold text-on-surface truncate">${inc.title}</div>
           <div class="font-code-sm text-[11px] text-on-surface-variant truncate">${inc.service} · ${inc.alert_count || 1} alerts grouped</div>
         </div>
-        <button onclick="event.stopPropagation(); window.inspectIncident('${inc.id}')" class="p-1.5 rounded bg-surface-container text-primary hover:bg-primary hover:text-white transition-colors shrink-0">
+        <button onclick="event.stopPropagation(); window.inspectIncident('${inc.id}')" class="p-1.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
         </button>
       `;
@@ -401,7 +364,7 @@
           <td colspan="7" class="py-12 text-center text-secondary font-body-md">
             <span class="material-symbols-outlined text-[40px] text-outline mb-2">notifications_off</span>
             <div class="font-semibold text-on-surface">No alerts processed yet</div>
-            <div class="text-xs text-on-surface-variant mt-1">Send webhook payloads to /api/v1/alerts/webhook to populate this table with real data.</div>
+            <div class="text-xs text-on-surface-variant mt-1">The system is connected and ready to process incoming telemetry.</div>
           </td>
         </tr>
       `;

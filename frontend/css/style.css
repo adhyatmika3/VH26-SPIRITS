@@ -137,6 +137,19 @@
   animation: alert-entry 0.6s ease-out forwards;
 }
 
+/* Skeleton Loading Shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #eceef0 25%, #f7f9fb 50%, #eceef0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
 /* Modal Overlay */
 .modal-overlay {
   position: fixed;

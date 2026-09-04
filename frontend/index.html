@@ -235,295 +235,163 @@
       <!-- VIEW 1: OPERATIONS OVERVIEW (DASHBOARD)     -->
       <!-- ========================================== -->
       <section id="view-dashboard" class="view-section active-view flex flex-col w-full space-y-space-lg">
-        <!-- 30-Second Judge Pitch Hero Banner -->
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900 via-indigo-800 to-primary p-6 md:p-8 text-white shadow-lg">
-          <div class="relative z-10 flex flex-col gap-4">
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-indigo-200 font-code-sm text-xs font-semibold uppercase tracking-wider backdrop-blur-sm border border-white/10">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                Hackathon Judge Overview · 30-Second Understanding
+        
+        <!-- Simplified Clean Header Banner -->
+        <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-xs font-bold uppercase tracking-wider">
+                SRE Intelligence Platform
               </span>
-              <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 text-white font-code-sm text-xs">
-                <span>Polling:</span>
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                <span id="countdown-tag" class="font-bold text-emerald-300">2s</span>
-              </div>
+              <span class="inline-flex items-center gap-1.5 font-code-sm text-xs text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Live Database Connected
+              </span>
             </div>
-            
-            <div class="max-w-4xl space-y-2">
-              <h1 class="font-headline-lg text-2xl md:text-3xl font-bold tracking-tight text-white leading-tight">
-                Eliminate Alert Fatigue. Focus on What Actually Matters.
-              </h1>
-              <p class="text-indigo-100 text-sm md:text-base leading-relaxed">
-                98% of telemetry alerts are redundant bursts, transient metric flaps, or background noise. Alert Fatigue Buster acts as an intelligent firewall for human attention—deduplicating repeats, correlating distributed cascade failures into single incidents, and suppressing non-actionable noise in real time.
-              </p>
+            <h1 class="font-headline-lg text-2xl md:text-3xl font-bold text-on-surface tracking-tight">
+              Real-Time Alert Noise Reduction & Incident Correlation
+            </h1>
+            <p class="font-body-sm text-sm text-on-surface-variant max-w-3xl">
+              Eliminating cognitive alert fatigue by collapsing duplicate spikes, correlating cascading microservice failures into root-cause incidents, and delivering high-signal on-call notifications.
+            </p>
+          </div>
+          
+          <div class="flex items-center gap-3 shrink-0 self-start md:self-center">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-highest text-xs font-code-sm text-secondary">
+              <span class="material-symbols-outlined text-[16px] text-primary">sync</span>
+              <span>Polling: <strong id="countdown-tag" class="text-on-surface">2s</strong></span>
             </div>
+            <button onclick="fetchAllRealData()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-on-primary font-label-md text-xs font-semibold hover:bg-primary-container transition-colors shadow-sm">
+              <span class="material-symbols-outlined text-[16px]">refresh</span>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
 
-            <!-- 5-Stage Story Pipeline -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 text-xs font-code-sm">
-              <div class="flex flex-col p-2.5 rounded-xl bg-white/10 border border-white/10 backdrop-blur-sm">
-                <span class="text-indigo-200 text-[10px] font-semibold uppercase">Stage 1</span>
-                <span class="font-bold text-white mt-0.5">Alerts Received</span>
-                <span class="text-indigo-300 text-[11px]" id="flow-val-received">Raw event flood</span>
-              </div>
-              <div class="flex flex-col p-2.5 rounded-xl bg-white/10 border border-white/10 backdrop-blur-sm">
-                <span class="text-indigo-200 text-[10px] font-semibold uppercase">Stage 2</span>
-                <span class="font-bold text-white mt-0.5">Remove Repeats</span>
-                <span class="text-indigo-300 text-[11px]" id="flow-val-dedup">Deduplication pool</span>
-              </div>
-              <div class="flex flex-col p-2.5 rounded-xl bg-white/10 border border-white/10 backdrop-blur-sm">
-                <span class="text-indigo-200 text-[10px] font-semibold uppercase">Stage 3</span>
-                <span class="font-bold text-white mt-0.5">Group Related</span>
-                <span class="text-indigo-300 text-[11px]" id="flow-val-grouped">Correlated clusters</span>
-              </div>
-              <div class="flex flex-col p-2.5 rounded-xl bg-white/10 border border-white/10 backdrop-blur-sm">
-                <span class="text-indigo-200 text-[10px] font-semibold uppercase">Stage 4</span>
-                <span class="font-bold text-white mt-0.5">Prevent Noise</span>
-                <span class="text-indigo-300 text-[11px]" id="flow-val-suppressed">Suppression rules</span>
-              </div>
-              <div class="flex flex-col p-2.5 rounded-xl bg-white/10 border border-white/10 backdrop-blur-sm">
-                <span class="text-indigo-200 text-[10px] font-semibold uppercase">Stage 5</span>
-                <span class="font-bold text-emerald-300 mt-0.5">Actionable Dispatched</span>
-                <span class="text-indigo-300 text-[11px]" id="flow-val-notified">Slack on-call</span>
-              </div>
-              <div class="flex flex-col p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/30 backdrop-blur-sm">
-                <span class="text-emerald-300 text-[10px] font-semibold uppercase">Outcome</span>
-                <span class="font-bold text-emerald-200 mt-0.5">Attention Saved</span>
-                <span class="text-emerald-300 text-[11px]">Zero operator burnout</span>
-              </div>
+        <!-- Operational Summary: 4 Essential Real-Data KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+          
+          <!-- KPI 1: Ingested Alerts -->
+          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">1. Ingested Alerts</span>
+              <span class="material-symbols-outlined text-[20px] text-primary">sensors</span>
             </div>
+            <div class="my-3">
+              <div class="text-3xl font-bold text-on-surface font-code-sm tracking-tight" id="val-incoming">0</div>
+              <p class="text-xs text-on-surface-variant mt-1">Raw telemetry received across all services</p>
+            </div>
+            <span class="font-code-sm text-[11px] text-secondary bg-surface-container-low px-2.5 py-1 rounded-lg font-medium self-start">Input Volume</span>
+          </div>
 
-            <div class="pt-1 border-t border-white/10 text-xs italic text-indigo-200 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px] text-amber-300">format_quote</span>
-              <span>"We don't just process more alerts. We help humans focus on the alerts that actually matter."</span>
+          <!-- KPI 2: Repeated Alerts Removed -->
+          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">2. Repeated Removed</span>
+              <span class="material-symbols-outlined text-[20px] text-primary">filter_alt</span>
+            </div>
+            <div class="my-3">
+              <div class="text-3xl font-bold text-primary font-code-sm tracking-tight" id="val-dedup-count">0</div>
+              <p class="text-xs text-on-surface-variant mt-1">Coalesced in temporal sliding windows</p>
+            </div>
+            <span class="font-code-sm text-[11px] text-primary bg-primary-fixed px-2.5 py-1 rounded-lg font-medium self-start">Deduplication</span>
+          </div>
+
+          <!-- KPI 3: Correlated Groups -->
+          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">3. Correlated Groups</span>
+              <span class="material-symbols-outlined text-[20px] text-blue-600">hub</span>
+            </div>
+            <div class="my-3">
+              <div class="text-3xl font-bold text-blue-600 font-code-sm tracking-tight" id="val-grouped-count">0</div>
+              <p class="text-xs text-on-surface-variant mt-1">Cascades bundled into active incidents</p>
+            </div>
+            <span class="font-code-sm text-[11px] text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg font-medium self-start">Topology Correlation</span>
+          </div>
+
+          <!-- KPI 4: Actionable Dispatches & Noise Reduction -->
+          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
+            <div class="flex items-center justify-between">
+              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">4. Actionable Dispatched</span>
+              <span class="material-symbols-outlined text-[20px] text-emerald-600">send</span>
+            </div>
+            <div class="my-3">
+              <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-bold text-emerald-600 font-code-sm tracking-tight" id="val-actionable">0</span>
+                <span class="text-xs font-bold text-emerald-700 font-code-sm" id="val-noise-reduction-pct">0% reduced</span>
+              </div>
+              <p class="text-xs text-on-surface-variant mt-1">High-signal alerts sent to on-call responders</p>
+            </div>
+            <span class="font-code-sm text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg font-medium self-start">Fatigue Eliminated</span>
+          </div>
+
+        </div>
+
+        <!-- Telemetry Reduction Flow Strip -->
+        <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="material-symbols-outlined text-[20px] text-primary">analytics</span>
+            <span class="font-label-md text-xs font-bold text-on-surface uppercase tracking-wider">Intelligence Pipeline Flow:</span>
+          </div>
+
+          <div class="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full text-center font-code-sm text-xs">
+            <div class="p-2 rounded-lg bg-surface-container-low border border-surface-container-highest">
+              <span class="text-secondary text-[10px] block">Stage 1: Ingestion</span>
+              <span class="font-bold text-on-surface" id="flow-val-received">0 alerts</span>
+            </div>
+            <div class="p-2 rounded-lg bg-surface-container-low border border-surface-container-highest">
+              <span class="text-secondary text-[10px] block">Stage 2: Deduplication</span>
+              <span class="font-bold text-primary" id="flow-val-dedup">0 repeats</span>
+            </div>
+            <div class="p-2 rounded-lg bg-surface-container-low border border-surface-container-highest">
+              <span class="text-secondary text-[10px] block">Stage 3: Correlation</span>
+              <span class="font-bold text-blue-600" id="flow-val-grouped">0 grouped</span>
+            </div>
+            <div class="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+              <span class="text-emerald-800 text-[10px] block">Stage 4: Dispatch</span>
+              <span class="font-bold text-emerald-700" id="flow-val-notified">0 notifications</span>
             </div>
           </div>
         </div>
 
-        <!-- KPI Grid (6 Clear Judge Metrics with Plain English + Subtitle Badges) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-space-md">
-          <!-- Card 1: Total Alerts Received -->
-          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all border border-surface-container-highest">
-            <div class="flex items-center justify-between">
-              <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Total Alerts Received</span>
-              <span class="material-symbols-outlined text-[18px] text-primary">sensors</span>
-            </div>
-            <div class="my-2">
-              <div class="flex items-baseline gap-2">
-                <span class="font-headline-lg text-2xl font-bold text-on-surface tracking-tight" id="val-incoming">33</span>
-              </div>
-              <span class="font-body-sm text-xs text-on-surface-variant">Incoming event telemetry</span>
-            </div>
-            <span class="font-code-sm text-[11px] text-secondary bg-surface-container-low px-2 py-0.5 rounded">All Sources</span>
-          </div>
-
-          <!-- Card 2: Remove Repeated Alerts (Deduplication) -->
-          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all border border-surface-container-highest">
-            <div class="flex items-center justify-between">
-              <div class="flex flex-col">
-                <span class="font-label-sm text-xs font-semibold text-on-surface">Repeated Removed</span>
-                <span class="font-code-sm text-[10px] text-primary font-bold uppercase">Deduplication</span>
-              </div>
-              <span class="material-symbols-outlined text-[18px] text-primary">filter_alt</span>
-            </div>
-            <div class="my-2">
-              <div class="flex items-baseline gap-2">
-                <span class="font-headline-lg text-2xl font-bold text-primary tracking-tight" id="val-dedup-count">17</span>
-              </div>
-              <span class="font-body-sm text-xs text-on-surface-variant">Duplicate spikes coalesced</span>
-            </div>
-            <span class="font-code-sm text-[11px] text-primary bg-primary-fixed px-2 py-0.5 rounded font-medium">Sliding Window</span>
-          </div>
-
-          <!-- Card 3: Group Related Alerts (Correlation) -->
-          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all border border-surface-container-highest">
-            <div class="flex items-center justify-between">
-              <div class="flex flex-col">
-                <span class="font-label-sm text-xs font-semibold text-on-surface">Related Grouped</span>
-                <span class="font-code-sm text-[10px] text-blue-600 font-bold uppercase">Correlation</span>
-              </div>
-              <span class="material-symbols-outlined text-[18px] text-blue-600">hub</span>
-            </div>
-            <div class="my-2">
-              <div class="flex items-baseline gap-2">
-                <span class="font-headline-lg text-2xl font-bold text-blue-600 tracking-tight" id="val-grouped-count">10</span>
-              </div>
-              <span class="font-body-sm text-xs text-on-surface-variant">Linked to active incidents</span>
-            </div>
-            <span class="font-code-sm text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium">Topology Clusters</span>
-          </div>
-
-          <!-- Card 4: Prevent Unnecessary Notifications (Suppression) -->
-          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all border border-surface-container-highest">
-            <div class="flex items-center justify-between">
-              <div class="flex flex-col">
-                <span class="font-label-sm text-xs font-semibold text-on-surface">Noise Prevented</span>
-                <span class="font-code-sm text-[10px] text-emerald-600 font-bold uppercase">Suppression</span>
-              </div>
-              <span class="material-symbols-outlined text-[18px] text-emerald-600">filter_alt_off</span>
-            </div>
-            <div class="my-2">
-              <div class="flex items-baseline gap-2">
-                <span class="font-headline-lg text-2xl font-bold text-emerald-600 tracking-tight" id="val-suppressed-count">16</span>
-              </div>
-              <span class="font-body-sm text-xs text-on-surface-variant" id="val-noise-reduction-pct">48.5% noise eliminated</span>
-            </div>
-            <span class="font-code-sm text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">Fatigue Blocked</span>
-          </div>
-
-          <!-- Card 5: Important Alerts Delivered (Actionable) -->
-          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all border border-surface-container-highest">
-            <div class="flex items-center justify-between">
-              <div class="flex flex-col">
-                <span class="font-label-sm text-xs font-semibold text-on-surface">Important Alerts</span>
-                <span class="font-code-sm text-[10px] text-violet-600 font-bold uppercase">Delivered</span>
-              </div>
-              <span class="material-symbols-outlined text-[18px] text-violet-600">send</span>
-            </div>
-            <div class="my-2">
-              <div class="flex items-baseline gap-2">
-                <span class="font-headline-lg text-2xl font-bold text-violet-600 tracking-tight" id="val-actionable">5</span>
-              </div>
-              <span class="font-body-sm text-xs text-on-surface-variant">Clean responder dispatches</span>
-            </div>
-            <span class="font-code-sm text-[11px] text-violet-700 bg-violet-50 px-2 py-0.5 rounded font-medium">Slack Paged</span>
-          </div>
-
-          <!-- Card 6: Average Time to Acknowledge (MTTA) & Resolve (MTTR) -->
-          <div class="flex flex-col justify-between bg-surface-container-lowest p-space-base rounded-xl shadow-sm hover:shadow-md transition-all border border-surface-container-highest">
-            <div class="flex items-center justify-between">
-              <div class="flex flex-col">
-                <span class="font-label-sm text-xs font-semibold text-on-surface">Time to Respond</span>
-                <span class="font-code-sm text-[10px] text-amber-600 font-bold uppercase">MTTA & MTTR</span>
-              </div>
-              <span class="material-symbols-outlined text-[18px] text-amber-600">timer</span>
-            </div>
-            <div class="my-2">
-              <div class="flex items-baseline gap-1">
-                <span class="font-headline-lg text-xl font-bold text-on-surface tracking-tight" id="val-mtta-display">0s</span>
-                <span class="text-xs text-secondary">ack</span>
-                <span class="text-secondary mx-0.5">·</span>
-                <span class="font-headline-lg text-base font-bold text-on-surface tracking-tight" id="val-mttr-display">N/A</span>
-                <span class="text-xs text-secondary">res</span>
-              </div>
-              <span class="font-body-sm text-xs text-on-surface-variant">SLA Target &lt; 5m</span>
-            </div>
-            <span class="font-code-sm text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium">Operator Metric</span>
-          </div>
-        </div>
-
-        <!-- Before vs After Platform Comparison Card (The Wow Factor) -->
-        <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-surface-container-highest">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="font-headline-sm text-lg font-bold text-on-surface">Measurable Human Impact: Before vs After</span>
-                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-code-sm text-xs font-bold">PROVEN VALUE</span>
-              </div>
-              <p class="text-sm text-on-surface-variant">Quantifying alert fatigue reduction and engineer focus saved across your fleet</p>
-            </div>
-            <span class="font-code-sm text-xs text-secondary bg-surface-container px-2.5 py-1 rounded-lg">LIVE TELEMETRY AUDIT</span>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Without Platform -->
-            <div class="p-4 rounded-xl bg-red-50/50 border border-red-200 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-sm text-red-900 flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-[18px] text-red-600">cancel</span>
-                  Without Alert Fatigue Buster
-                </span>
-                <span class="px-2 py-0.5 rounded bg-red-100 text-red-800 font-code-sm text-xs font-bold">STATUS QUO</span>
-              </div>
-              <div class="grid grid-cols-2 gap-3 text-xs font-body-sm">
-                <div class="p-2.5 rounded-lg bg-white border border-red-100">
-                  <div class="text-secondary">Raw Alert Interruptions:</div>
-                  <div class="text-lg font-bold text-red-600 font-code-sm mt-0.5" id="val-before-interruptions">Awaiting data</div>
-                  <div class="text-[11px] text-red-500">Every raw alert becomes a pager event</div>
-                </div>
-                <div class="p-2.5 rounded-lg bg-white border border-red-100">
-                  <div class="text-secondary">No Deduplication:</div>
-                  <div class="text-lg font-bold text-red-600 font-code-sm mt-0.5">Duplicates not removed</div>
-                  <div class="text-[11px] text-red-500">Same alert fires repeatedly</div>
-                </div>
-                <div class="p-2.5 rounded-lg bg-white border border-red-100">
-                  <div class="text-secondary">No Suppression:</div>
-                  <div class="text-lg font-bold text-red-600 font-code-sm mt-0.5">All noise forwarded</div>
-                  <div class="text-[11px] text-red-500">Low-priority alerts interrupt</div>
-                </div>
-                <div class="p-2.5 rounded-lg bg-white border border-red-100">
-                  <div class="text-secondary">On-Call Burnout Risk:</div>
-                  <div class="text-lg font-bold text-red-600 font-code-sm mt-0.5">HIGH</div>
-                  <div class="text-[11px] text-red-500">Alert fatigue degrades response</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- With Platform -->
-            <div class="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-sm text-emerald-900 flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
-                  With Alert Fatigue Buster
-                </span>
-                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-code-sm text-xs font-bold">INTELLIGENT PIPELINE</span>
-              </div>
-              <div class="grid grid-cols-2 gap-3 text-xs font-body-sm">
-                <div class="p-2.5 rounded-lg bg-white border border-emerald-100">
-                  <div class="text-secondary">Actionable Notifications:</div>
-                  <div class="text-lg font-bold text-emerald-700 font-code-sm mt-0.5" id="val-after-notifications">5 / day</div>
-                  <div class="text-[11px] text-emerald-600" id="val-after-reduction-note">Noise eliminated</div>
-                </div>
-                <div class="p-2.5 rounded-lg bg-white border border-emerald-100">
-                  <div class="text-secondary">Avg Time to Acknowledge:</div>
-                  <div class="text-lg font-bold text-emerald-700 font-code-sm mt-0.5" id="val-after-mtta">0s</div>
-                  <div class="text-[11px] text-emerald-600">Immediate, focused triage</div>
-                </div>
-                <div class="p-2.5 rounded-lg bg-white border border-emerald-100">
-                  <div class="text-secondary">Noise Reduction Rate:</div>
-                  <div class="text-lg font-bold text-emerald-700 font-code-sm mt-0.5" id="val-after-reduction">48.5%</div>
-                  <div class="text-[11px] text-emerald-600">Clean signal delivered</div>
-                </div>
-                <div class="p-2.5 rounded-lg bg-white border border-emerald-100">
-                  <div class="text-secondary">Estimated Attention Avoided:</div>
-                  <div class="text-lg font-bold text-emerald-700 font-code-sm mt-0.5" id="val-after-hours">Awaiting data</div>
-                  <div class="text-[11px] text-emerald-600" id="val-after-hours-note">Based on configurable avg handling time per avoided notification</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Real-time Ingestion Stream Chart & Flow -->
-
-        <!-- Two-Column Overview Layout (Real Data Only) -->
+        <!-- Main Intelligence Grid: Recent Ingested Alerts & Active Correlated Incidents -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
-          <!-- Left Column: Recent Alerts (8 Cols) -->
-          <div class="lg:col-span-8 flex flex-col bg-surface-container-lowest p-space-lg rounded-xl shadow-sm gap-space-md">
-            <div class="flex items-center justify-between border-b border-surface-container-highest pb-space-sm">
+          
+          <!-- Left Column: Recent Telemetry Alerts (7 Cols) -->
+          <div class="lg:col-span-7 flex flex-col bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest gap-space-md">
+            <div class="flex items-center justify-between border-b border-surface-container-highest pb-3">
               <div class="flex items-center gap-2">
-                <span class="font-headline-sm text-headline-sm text-on-surface font-semibold">Recent Telemetry Alerts</span>
-                <span class="inline-flex items-center px-2 py-0.5 rounded font-code-sm text-code-sm bg-surface-container text-secondary font-semibold">Live System Data</span>
+                <span class="font-headline-sm text-base font-bold text-on-surface">Recent Telemetry Alerts</span>
+                <span class="px-2 py-0.5 rounded font-code-sm text-[11px] bg-surface-container text-secondary font-semibold">PostgreSQL</span>
               </div>
-              <button onclick="navigateTo('live-alerts')" class="font-label-sm text-label-sm text-primary hover:underline">View All Alerts →</button>
+              <button onclick="navigateTo('live-alerts')" class="font-label-sm text-xs font-semibold text-primary hover:underline flex items-center gap-1">
+                <span>View Alert Explorer</span>
+                <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+              </button>
             </div>
             <div id="overview-alerts-list" class="flex flex-col gap-2">
               <!-- Dynamically populated from real API -->
             </div>
           </div>
 
-          <!-- Right Column: Active Incidents (4 Cols) -->
-          <div class="lg:col-span-4 flex flex-col bg-surface-container-lowest p-space-lg rounded-xl shadow-sm gap-space-md">
-            <div class="flex items-center justify-between border-b border-surface-container-highest pb-space-sm">
+          <!-- Right Column: Active Correlated Incidents (5 Cols) -->
+          <div class="lg:col-span-5 flex flex-col bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest gap-space-md">
+            <div class="flex items-center justify-between border-b border-surface-container-highest pb-3">
               <div class="flex items-center gap-2">
-                <span class="font-headline-sm text-headline-sm text-on-surface font-semibold">Active Incidents</span>
+                <span class="font-headline-sm text-base font-bold text-on-surface">Active Correlated Incidents</span>
+                <span class="px-2 py-0.5 rounded font-code-sm text-[11px] bg-primary-fixed text-on-primary-fixed font-semibold">Clusters</span>
               </div>
-              <button onclick="navigateTo('incident-details')" class="font-label-sm text-label-sm text-primary hover:underline">View All →</button>
+              <button onclick="navigateTo('incident-details')" class="font-label-sm text-xs font-semibold text-primary hover:underline flex items-center gap-1">
+                <span>Investigate Timeline</span>
+                <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+              </button>
             </div>
             <div id="overview-incidents-list" class="flex flex-col gap-2">
               <!-- Dynamically populated from real API -->
             </div>
           </div>
+
         </div>
       </section>
 
