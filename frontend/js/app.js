@@ -390,30 +390,32 @@
         ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-code-sm text-[11px]"><span class="material-symbols-outlined text-[13px]">filter_alt_off</span>Suppressed</span>`
         : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary-container text-on-primary font-code-sm text-[11px] font-medium"><span class="material-symbols-outlined text-[13px]">bolt</span>Notified</span>`;
 
+      const actionBtn = alert.incident_id
+        ? `<button onclick="event.stopPropagation(); window.inspectIncident('${alert.incident_id}')" title="Inspect Correlated Incident" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-primary-fixed text-on-primary-fixed font-code-sm text-xs font-semibold hover:bg-primary hover:text-white transition-colors">
+            <span>Cluster</span>
+            <span class="material-symbols-outlined text-[14px]">timeline</span>
+          </button>`
+        : `<span class="font-code-sm text-[11px] text-secondary">Standalone</span>`;
+
       tr.innerHTML = `
-        <td class="py-2.5 px-3 font-code-sm text-code-sm text-secondary">${timeStr}</td>
+        <td class="py-2.5 px-3 font-code-sm text-xs text-secondary">${timeStr}</td>
         <td class="py-2.5 px-3">${sevBadge}</td>
-        <td class="py-2.5 px-3 font-code-sm text-code-sm font-semibold text-on-surface">
-          <div class="flex items-center gap-1.5">
-            <span>${alert.title || alert.alert_name || 'Alert'}</span>
-            <button onclick="event.stopPropagation(); window.openAlertDecisionDrawer('${alert.id}')" title="Explain Decision (What / Why / Confidence)" class="px-1.5 py-0.5 rounded bg-surface-container text-primary text-[10px] font-bold hover:bg-primary hover:text-white transition-colors">
-              Why?
-            </button>
-          </div>
+        <td class="py-2.5 px-3 font-code-sm text-xs font-semibold text-on-surface">
+          <div>${alert.title || alert.alert_name || 'Alert'}</div>
           <div class="text-[11px] font-normal text-on-surface-variant line-clamp-1">${alert.message || alert.summary || ''}</div>
         </td>
-        <td class="py-2.5 px-3 font-code-sm text-code-sm text-primary font-medium">${alert.service || 'service'}</td>
-        <td class="py-2.5 px-3 font-code-sm text-code-sm text-secondary">${alert.occurrence_count || alert.occurrences || 1}x</td>
+        <td class="py-2.5 px-3 font-code-sm text-xs text-primary font-medium">${alert.service || 'service'}</td>
+        <td class="py-2.5 px-3 font-code-sm text-xs text-secondary">${alert.occurrence_count || alert.occurrences || 1}x</td>
         <td class="py-2.5 px-3">${statusPill}</td>
-        <td class="py-2.5 px-3 text-right">
-          <button onclick="event.stopPropagation(); window.openAlertDecisionDrawer('${alert.id}')" title="Explain Decision" class="p-1 rounded hover:bg-primary/10 text-primary transition-colors">
-            <span class="material-symbols-outlined text-[18px]">psychology</span>
-          </button>
-        </td>
+        <td class="py-2.5 px-3 text-right">${actionBtn}</td>
       `;
 
       tr.addEventListener('click', () => {
-        window.openAlertDecisionDrawer(alert.id);
+        if (alert.incident_id) {
+          window.inspectIncident(alert.incident_id);
+        } else {
+          showToast(`Alert: ${alert.title || alert.alert_name} (${alert.service}) — ${alert.status}`, 'info');
+        }
       });
 
       elements.alertsTableBody.appendChild(tr);
@@ -442,20 +444,29 @@
       filtered.forEach((alert) => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-surface-container-low transition-colors border-b border-surface-container-high group cursor-pointer';
+        const isSuppressed = alert.status === 'SUPPRESSED' || alert.is_duplicate;
+        const statusPill = isSuppressed
+          ? `<span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-code-sm text-[11px]">Suppressed</span>`
+          : `<span class="px-2 py-0.5 rounded bg-primary-container text-on-primary font-code-sm text-[11px]">Notified</span>`;
+
         tr.innerHTML = `
-          <td class="py-2.5 px-3 font-code-sm text-code-sm text-secondary">${alert.created_at ? new Date(alert.created_at).toLocaleTimeString() : '—'}</td>
-          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] font-bold">${alert.severity || 'INFO'}</span></td>
-          <td class="py-2.5 px-3 font-code-sm text-code-sm font-semibold text-on-surface">${alert.title || alert.alert_name}</td>
-          <td class="py-2.5 px-3 font-code-sm text-code-sm text-primary font-medium">${alert.service}</td>
-          <td class="py-2.5 px-3 font-code-sm text-code-sm text-secondary">${alert.occurrence_count || 1}x</td>
-          <td class="py-2.5 px-3"><span class="text-secondary font-code-sm text-[11px]">${alert.status}</span></td>
+          <td class="py-2.5 px-3 font-code-sm text-xs text-secondary">${alert.created_at ? new Date(alert.created_at).toLocaleTimeString() : '—'}</td>
+          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] font-bold ${alert.severity === 'CRITICAL' ? 'text-error' : 'text-primary'}">${alert.severity || 'INFO'}</span></td>
+          <td class="py-2.5 px-3 font-code-sm text-xs font-semibold text-on-surface">${alert.title || alert.alert_name}</td>
+          <td class="py-2.5 px-3 font-code-sm text-xs text-primary font-medium">${alert.service}</td>
+          <td class="py-2.5 px-3 font-code-sm text-xs text-secondary">${alert.occurrence_count || 1}x</td>
+          <td class="py-2.5 px-3">${statusPill}</td>
           <td class="py-2.5 px-3 text-right">
-            <button onclick="event.stopPropagation(); window.openAlertDecisionDrawer('${alert.id}')" class="p-1 rounded hover:bg-surface-container text-primary">
-              <span class="material-symbols-outlined text-[18px]">psychology</span>
-            </button>
+            ${alert.incident_id ? `<button onclick="event.stopPropagation(); window.inspectIncident('${alert.incident_id}')" class="px-2 py-1 rounded bg-primary-fixed text-on-primary-fixed text-xs font-semibold hover:bg-primary hover:text-white transition-colors">Cluster</button>` : `<span class="text-xs text-secondary">—</span>`}
           </td>
         `;
-        tr.addEventListener('click', () => window.openAlertDecisionDrawer(alert.id));
+        tr.addEventListener('click', () => {
+          if (alert.incident_id) {
+            window.inspectIncident(alert.incident_id);
+          } else {
+            showToast(`Alert: ${alert.title || alert.alert_name} (${alert.service})`, 'info');
+          }
+        });
         elements.alertsTableBody.appendChild(tr);
       });
     }
@@ -650,135 +661,14 @@
     const container = document.getElementById('incident-timeline-container');
     if (container) {
       container.innerHTML = `
-        <div class="p-8 text-center text-secondary">
+        <div class="p-8 text-center text-secondary border border-dashed border-surface-container-highest rounded-2xl">
           <span class="material-symbols-outlined text-[40px] text-outline mb-2">timeline</span>
           <div class="font-semibold text-on-surface">No incident selected</div>
-          <div class="text-xs text-on-surface-variant mt-1">Select an incident from the list or send alerts to generate incident clusters.</div>
+          <div class="text-xs text-on-surface-variant mt-1">Select an incident from the dropdown or send alerts to form clusters.</div>
         </div>
       `;
     }
   }
-
-  // Explainable Decision Drawer UI (Real API)
-  window.openAlertDecisionDrawer = async function (alertId) {
-    const backdrop = document.getElementById('decision-drawer-backdrop');
-    const panel = document.getElementById('decision-drawer-panel');
-    if (!backdrop || !panel) return;
-
-    // Reset fields to loading state safely
-    const whatText = document.getElementById('drawer-what-happened-text');
-    if (whatText) whatText.innerText = 'Loading decision explanation...';
-
-    const whyText = document.getElementById('drawer-why-text');
-    if (whyText) whyText.innerText = 'Retrieving context-aware reasoning...';
-
-    const confBadge = document.getElementById('drawer-confidence-badge');
-    if (confBadge) confBadge.innerText = 'ANALYZING';
-
-    const confBar = document.getElementById('drawer-confidence-bar');
-    if (confBar) confBar.style.width = '50%';
-
-    const reasonCodes = document.getElementById('drawer-reason-codes');
-    if (reasonCodes) reasonCodes.innerHTML = '<span class="text-secondary text-[11px]">Loading...</span>';
-
-    const latencyElem = document.getElementById('drawer-processing-latency');
-    if (latencyElem) latencyElem.innerText = '...';
-
-    const rawJson = document.getElementById('drawer-raw-json');
-    if (rawJson) rawJson.innerText = '// Fetching backend payload...';
-
-    // Show drawer
-    backdrop.classList.add('active');
-    panel.classList.add('open');
-
-    try {
-      const resp = await fetch(`http://localhost:8000/api/v1/dashboard/explain/alert/${alertId}`);
-      if (resp.ok) {
-        const exp = await resp.json();
-        populateDrawer(exp);
-        return;
-      }
-    } catch (e) {
-      console.warn('Explain endpoint failed for alert:', alertId);
-    }
-
-    // Honest empty state when no decision record is available
-    populateDrawer({
-      what_happened: 'Decision Evaluated',
-      decision: 'SUPPRESS_NOISE',
-      why: `Processed deterministically by sliding window deduplication and fingerprint clustering.`,
-      confidence_label: 'High',
-      evidence: ['Fingerprint match in 5m sliding cooldown', 'Service topology correlation'],
-      technical_details: { alert_id: alertId, processing_time_ms: 1.2 }
-    });
-  };
-
-  function populateDrawer(exp) {
-    const isSuppressed = (exp.decision || '').includes('SUPPRESS') || (exp.what_happened || '').includes('Prevented');
-
-    const whatText = document.getElementById('drawer-what-happened-text');
-    if (whatText) whatText.innerText = exp.what_happened || (isSuppressed ? 'Noise Suppressed by Buster Engine' : 'Dispatched Actionable Notification');
-
-    const whyText = document.getElementById('drawer-why-text');
-    if (whyText) whyText.innerText = exp.why || 'Decision verified against active SRE deduplication and correlation policies.';
-
-    // Qualitative confidence badge
-    const confLabel = exp.confidence_label || 'High';
-    const confBadge = document.getElementById('drawer-confidence-badge');
-    const confColors = {
-      'High': 'bg-emerald-100 text-emerald-800',
-      'Medium': 'bg-amber-100 text-amber-800',
-      'Low': 'bg-red-100 text-red-800'
-    };
-    if (confBadge) {
-      confBadge.className = `px-2.5 py-0.5 rounded-full font-code-sm text-xs font-bold ${confColors[confLabel] || confColors['High']}`;
-      confBadge.innerText = `${confLabel} Confidence`;
-    }
-
-    const confWidths = { 'High': '98.8%', 'Medium': '75%', 'Low': '40%' };
-    const confBar = document.getElementById('drawer-confidence-bar');
-    if (confBar) confBar.style.width = confWidths[confLabel] || '95%';
-
-    // Evidence list
-    const reasonsContainer = document.getElementById('drawer-reason-codes');
-    const evidenceItems = exp.evidence || ['Sliding window deduplication', 'Cryptographic fingerprint grouping'];
-    if (reasonsContainer) {
-      reasonsContainer.innerHTML = evidenceItems
-        .map((e) => `<div class="flex items-start gap-1.5 py-1">
-          <span class="material-symbols-outlined text-[14px] text-primary mt-0.5">check_circle</span>
-          <span class="font-body-sm text-xs text-on-surface-variant">${e}</span>
-        </div>`)
-        .join('');
-    }
-
-    const processingMs = (exp.technical_details || {}).processing_time_ms || 1.4;
-    const latencyElem = document.getElementById('drawer-processing-latency');
-    if (latencyElem) latencyElem.innerText = `${processingMs.toFixed(1)} ms`;
-
-    const rawJson = document.getElementById('drawer-raw-json');
-    if (rawJson) rawJson.innerText = JSON.stringify(exp.technical_details || exp, null, 2);
-  }
-
-  window.closeDecisionDrawer = function () {
-    const backdrop = document.getElementById('decision-drawer-backdrop');
-    const panel = document.getElementById('decision-drawer-panel');
-    if (backdrop) backdrop.classList.remove('active');
-    if (panel) panel.classList.remove('open');
-  };
-
-  window.toggleDrawerTechnicalDetails = function () {
-    const content = document.getElementById('drawer-tech-content');
-    const chevron = document.getElementById('drawer-tech-chevron');
-    if (!content) return;
-
-    if (content.classList.contains('hidden')) {
-      content.classList.remove('hidden');
-      if (chevron) chevron.innerText = 'expand_less';
-    } else {
-      content.classList.add('hidden');
-      if (chevron) chevron.innerText = 'expand_more';
-    }
-  };
 
   // Real Incident Timeline API Loader
   async function loadIncidentTimeline(incidentId) {

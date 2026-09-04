@@ -834,99 +834,10 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- SLIDE-OVER DRAWER: EXPLAINABLE DECISION    -->
-  <!-- (STEP 8: WHAT HAPPENED? WHY? CONFIDENCE)   -->
-  <!-- ========================================== -->
-  <div id="decision-drawer-backdrop" class="drawer-backdrop" onclick="closeDecisionDrawer()"></div>
-  <div id="decision-drawer-panel" class="drawer-panel p-6 space-y-6 overflow-y-auto">
-    <!-- Header -->
-    <div class="flex items-center justify-between border-b border-surface-container-highest pb-4">
-      <div class="space-y-0.5">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-[20px] text-primary">psychology</span>
-          <h2 class="font-headline-sm text-lg font-bold text-on-surface">Intelligence Decision Explanation</h2>
-        </div>
-        <p class="text-xs text-on-surface-variant">Deterministic SRE reasoning generated for non-technical judges</p>
-      </div>
-      <button onclick="closeDecisionDrawer()" class="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors">
-        <span class="material-symbols-outlined text-[22px]">close</span>
-      </button>
-    </div>
-
-    <!-- 1. WHAT HAPPENED? -->
-    <div class="space-y-1.5">
-      <span class="text-[11px] font-bold text-secondary uppercase tracking-wider">What Happened?</span>
-      <div id="drawer-what-happened" class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest font-headline-sm text-base font-bold text-on-surface flex items-center gap-2">
-        <span class="material-symbols-outlined text-emerald-600 text-[22px]" id="drawer-status-icon">check_circle</span>
-        <span id="drawer-what-happened-text">Evaluating intelligence verdict...</span>
-      </div>
-    </div>
-
-    <!-- 2. WHY? (Plain English) -->
-    <div class="space-y-1.5">
-      <span class="text-[11px] font-bold text-secondary uppercase tracking-wider">Why? (Plain-English Rationale)</span>
-      <div class="p-4 rounded-xl bg-primary-fixed/30 border border-primary/20 space-y-2">
-        <p id="drawer-why-text" class="text-sm leading-relaxed text-on-surface">
-          Analyzing decision audit trails and correlation context...
-        </p>
-        <div class="flex items-center gap-2 pt-1 border-t border-primary/10 text-xs text-primary font-medium">
-          <span class="material-symbols-outlined text-[16px]">verified</span>
-          <span>Zero guessing. Governed by deterministic triage policies.</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. DECISION CONFIDENCE -->
-    <div class="space-y-2 p-4 rounded-xl bg-surface-container-low border border-surface-container-highest">
-      <div class="flex items-center justify-between">
-        <span class="text-xs font-bold text-secondary uppercase tracking-wider">Decision Confidence</span>
-        <span id="drawer-confidence-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-code-sm text-xs font-bold">98.8% Certain</span>
-      </div>
-      <div class="w-full h-2.5 rounded-full bg-surface-container overflow-hidden">
-        <div id="drawer-confidence-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-500" style="width: 98.8%;"></div>
-      </div>
-      <p class="text-[11px] text-on-surface-variant">Computed deterministically from cryptographic fingerprints, temporal thresholds, and service topology.</p>
-    </div>
-
-    <!-- 4. TECHNICAL DETAILS (Expandable Accordion) -->
-    <div class="border border-surface-container-highest rounded-xl overflow-hidden">
-      <button onclick="toggleDrawerTechnicalDetails()" class="w-full px-4 py-3 bg-surface-container-low flex items-center justify-between text-left hover:bg-surface-container transition-colors cursor-pointer">
-        <span class="font-code-sm text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-1.5">
-          <span class="material-symbols-outlined text-[16px]">data_object</span>
-          Technical Details & Metadata
-        </span>
-        <span id="drawer-tech-chevron" class="material-symbols-outlined text-[18px] text-outline transition-transform">expand_more</span>
-      </button>
-      <div id="drawer-tech-content" class="p-4 bg-surface-container-lowest space-y-3 font-code-sm text-xs border-t border-surface-container-highest hidden">
-        <div>
-          <span class="text-secondary font-semibold">Reason Codes:</span>
-          <div id="drawer-reason-codes" class="flex flex-wrap gap-1 mt-1">
-            <!-- Codes -->
-          </div>
-        </div>
-        <div>
-          <span class="text-secondary font-semibold">Processing Latency:</span>
-          <span id="drawer-processing-latency" class="text-primary font-bold ml-1">1.45 ms</span>
-        </div>
-        <div>
-          <span class="text-secondary font-semibold">Context Snapshot:</span>
-          <pre id="drawer-raw-json" class="p-2.5 rounded-lg bg-surface-container-low text-[11px] text-on-surface-variant overflow-x-auto mt-1 max-h-48"></pre>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-
-
-
   <!-- Toast Notification Container -->
-
   <div id="toast-container"></div>
 
-  <!-- Core JavaScript Bundles -->
-  <script src="js/mockData.js"></script>
+  <!-- Core JavaScript Application Engine (Real-Data Driven) -->
   <script src="js/app.js"></script>
 </body>
 </html>
