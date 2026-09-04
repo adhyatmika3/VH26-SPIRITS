@@ -223,3 +223,36 @@ def record_acknowledgement_metric(service: str) -> None:
 def record_resolution_metric(service: str) -> None:
     clean_svc = sanitize_service_label(service)
     ALERT_RESOLUTIONS_TOTAL.labels(service=clean_svc).inc()
+
+
+# Slack-specific Observability Metrics
+SLACK_NOTIFICATIONS_TOTAL = Counter(
+    "slack_notifications_total",
+    "Total count of Slack notification attempts",
+    ["status"]  # "sent", "failed", "duplicate", "skipped"
+)
+SLACK_NOTIFICATIONS_SUCCESS_TOTAL = Counter(
+    "slack_notifications_success_total",
+    "Total count of successful Slack notifications"
+)
+SLACK_NOTIFICATIONS_FAILED_TOTAL = Counter(
+    "slack_notifications_failed_total",
+    "Total count of failed Slack notifications"
+)
+SLACK_NOTIFICATION_LATENCY_SECONDS = Histogram(
+    "slack_notification_latency_seconds",
+    "Latency of Slack notification delivery in seconds",
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
+)
+
+
+def record_slack_metric(status: str, duration_sec: Optional[float] = None) -> None:
+    st = status.lower()
+    SLACK_NOTIFICATIONS_TOTAL.labels(status=st).inc()
+    if st == "sent":
+        SLACK_NOTIFICATIONS_SUCCESS_TOTAL.inc()
+    elif st == "failed":
+        SLACK_NOTIFICATIONS_FAILED_TOTAL.inc()
+    if duration_sec is not None:
+        SLACK_NOTIFICATION_LATENCY_SECONDS.observe(duration_sec)
+

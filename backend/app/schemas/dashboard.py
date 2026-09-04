@@ -51,20 +51,26 @@ class DashboardSummaryResponse(BaseModel):
     - related_alerts_grouped: COUNT of canonical alerts that have been linked to an incident
     - suppressed_alerts: COUNT of decision records where decision = 'SUPPRESS'
     - notified_alerts: COUNT of decision records where decision = 'NOTIFY'
-    - noise_reduction_rate: (suppressed_alerts / total_alerts) * 100 if total_alerts > 0, else 0
+    - noise_reduction_rate / alert_reduction: ((total_alerts - core_incidents) / total_alerts) * 100 if total_alerts > 0, else 0
     - active_incidents: COUNT of incidents where status IN ('OPEN', 'ACKNOWLEDGED')
+    - core_incidents: COUNT of all incident rows created
     - active_dedupe_pool: COUNT of DISTINCT fingerprints across non-resolved canonical alerts
     - mtta_seconds: AVG(acknowledged_at - first_seen) across incidents with acknowledgement
     - mttr_seconds: AVG(resolved_at - first_seen) across resolved incidents
     """
     total_alerts: int = Field(..., description="Raw Alerts Received: Total incoming webhook events stored")
+    incoming_alerts: int = Field(default=0, description="Raw Alerts Received (alias for total_alerts)")
     unique_canonical_alerts: int = Field(..., description="Unique Alerts: Distinct fingerprints after deduplication")
     repeated_alert_occurrences: int = Field(..., description="Repeated Alert Occurrences: Extra duplicate events coalesced into existing fingerprints")
+    alerts_deduplicated: int = Field(default=0, description="Alerts deduplicated (alias for repeated_alert_occurrences)")
     related_alerts_grouped: int = Field(..., description="Alerts Grouped: Canonical alerts correlated and linked to incidents")
     suppressed_alerts: int = Field(..., description="Alerts Suppressed: Decision records where decision was SUPPRESS")
     notified_alerts: int = Field(..., description="Notifications Sent: Decision records where decision was NOTIFY")
     active_incidents: int = Field(..., description="Incidents Created: Currently open or acknowledged incidents")
-    noise_reduction_rate: float = Field(..., description="Noise reduction: (suppressed / total_alerts) * 100")
+    core_incidents: int = Field(default=0, description="Core Incidents created")
+    high_critical_incidents: int = Field(default=0, description="Critical & High Incidents: Active incidents requiring immediate engineer attention")
+    noise_reduction_rate: float = Field(..., description="Noise reduction: ((total_alerts - core_incidents) / total_alerts) * 100")
+    alert_reduction: float = Field(default=0.0, description="Alert reduction percentage: ((total_alerts - core_incidents) / total_alerts) * 100")
     mtta_seconds: float = Field(..., description="Average Time to Acknowledge from actual incident data (seconds)")
     mtta_formatted: str = Field(..., description="Human-friendly formatted MTTA (e.g. '3m 20s') or 'Awaiting data'")
     mttr_seconds: float = Field(..., description="Average Time to Resolve from actual incident data (seconds)")

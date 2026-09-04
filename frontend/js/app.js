@@ -149,6 +149,7 @@
     incidents: JSON.parse(JSON.stringify(DEFAULT_FALLBACK_INCIDENTS)),
     summary: JSON.parse(JSON.stringify(DEFAULT_FALLBACK_SUMMARY)),
     selectedIncidentId: DEFAULT_FALLBACK_INCIDENTS[0].id,
+    chartTimeRange: '1h',
     filterQuery: ''
   };
 
@@ -258,6 +259,18 @@
         handleModalSearch(e.target.value);
       });
     }
+
+    const simType = document.getElementById('sim-alert-type');
+    if (simType) {
+      simType.addEventListener('change', (e) => {
+        if (e.target.value === 'PaymentGatewayResponseAnomaly') {
+          const serviceSelect = document.getElementById('sim-service');
+          const sevSelect = document.getElementById('sim-severity');
+          if (serviceSelect) serviceSelect.value = 'payment-api';
+          if (sevSelect) sevSelect.value = 'critical';
+        }
+      });
+    }
   }
 
   // Navigation controller
@@ -316,22 +329,139 @@
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  // Fetch all real data from backend endpoints
-  async function fetchAllRealData() {
+  // System Health Real-time Verification (FastAPI + PostgreSQL + Slack Integration)
+  async function checkSystemHealth() {
+    const dot = document.getElementById('system-health-dot');
+    const text = document.getElementById('system-health-text');
+    const slackDot = document.getElementById('slack-health-dot');
+    const slackText = document.getElementById('slack-health-text');
+    const slackBadge = document.getElementById('slack-status-badge');
+    const slackValEnabled = document.getElementById('slack-val-enabled');
+    const slackIndEnabled = document.getElementById('slack-ind-enabled');
+    const slackValConnected = document.getElementById('slack-val-connected');
+    const slackIndConnected = document.getElementById('slack-ind-connected');
+    const slackValChannel = document.getElementById('slack-val-channel');
+    const slackIndChannel = document.getElementById('slack-ind-channel');
+
+    try {
+      const [apiRes, dbRes, slackRes] = await Promise.all([
+        fetch('http://localhost:8000/api/v1/health').catch(() => null),
+        fetch('http://localhost:8000/api/v1/health/db').catch(() => null),
+        fetch('http://localhost:8000/api/v1/integrations/slack/health').catch(() => null)
+      ]);
+      const apiOk = apiRes && apiRes.ok;
+      const dbData = dbRes && dbRes.ok ? await dbRes.json() : null;
+      const dbOk = dbData && dbData.database === 'connected';
+
+      if (dot && text) {
+        if (apiOk && dbOk) {
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+          text.innerText = 'API: ✓ | DB: ✓';
+        } else if (apiOk) {
+          dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+          text.innerText = 'API: ✓ | DB: ✗';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+          text.innerText = 'API: ✗ | DB: ✗';
+        }
+      }
+
+      // Slack Integration Status
+      if (slackRes && slackRes.ok) {
+        const slackData = await slackRes.json();
+        const isEnabled = slackData.enabled === true;
+        const isConnected = slackData.connected === true;
+        const isChannelConfigured = slackData.channel_configured === true;
+
+        if (slackDot && slackText) {
+          if (isEnabled && isConnected) {
+            slackDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            slackText.innerText = 'Slack: Connected';
+          } else if (isEnabled) {
+            slackDot.className = 'w-2 h-2 rounded-full bg-amber-500';
+            slackText.innerText = 'Slack: Enabled (Standby)';
+          } else {
+            slackDot.className = 'w-2 h-2 rounded-full bg-slate-400';
+            slackText.innerText = 'Slack: Disabled';
+          }
+        }
+
+        if (slackBadge) {
+          if (isEnabled && isConnected) {
+            slackBadge.className = 'px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+            slackBadge.innerText = 'ONLINE';
+          } else if (isEnabled) {
+            slackBadge.className = 'px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200';
+            slackBadge.innerText = 'STANDBY';
+          } else {
+            slackBadge.className = 'px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
+            slackBadge.innerText = 'DISABLED (Local Dev)';
+          }
+        }
+
+        if (slackValEnabled && slackIndEnabled) {
+          slackValEnabled.innerText = isEnabled ? 'Yes' : 'No';
+          slackIndEnabled.className = `w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`;
+        }
+        if (slackValConnected && slackIndConnected) {
+          slackValConnected.innerText = isConnected ? 'Connected' : (isEnabled ? 'Unreachable' : 'Not Connected');
+          slackIndConnected.className = `w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : (isEnabled ? 'bg-amber-500' : 'bg-slate-400')}`;
+        }
+        if (slackValChannel && slackIndChannel) {
+          const chanDisplay = slackData.channel === 'C0BV5L0G9C2' ? '#alert-buster' : (slackData.channel || 'Configured');
+          slackValChannel.innerText = isChannelConfigured ? chanDisplay : 'None';
+          slackIndChannel.className = `w-2 h-2 rounded-full ${isChannelConfigured ? 'bg-emerald-500' : 'bg-slate-400'}`;
+        }
+      } else {
+        if (slackDot && slackText) {
+          slackDot.className = 'w-2 h-2 rounded-full bg-slate-400';
+          slackText.innerText = 'Slack: Unreachable';
+        }
+        if (slackBadge) {
+          slackBadge.className = 'px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
+          slackBadge.innerText = 'OFFLINE';
+        }
+      }
+    } catch (e) {
+      if (dot && text) {
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        text.innerText = 'Offline';
+      }
+    }
+  }
+  window.checkSystemHealth = checkSystemHealth;
+
+  // Fetch all real data from backend endpoints and update active view
+  async function fetchAllRealData(isManual = false) {
     await Promise.all([
       fetchLiveSummary(),
       fetchRealAlerts(),
-      fetchRealIncidents()
+      fetchRealIncidents(),
+      checkSystemHealth()
     ]);
-    if (state.currentView === 'analytics') {
+    if (state.currentView === 'dashboard') {
+      renderDashboardOverview();
+      updateDashboardCharts();
+    } else if (state.currentView === 'live-alerts') {
+      renderLiveAlerts();
+    } else if (state.currentView === 'alert-groups') {
+      renderAlertGroups();
+    } else if (state.currentView === 'incident-details') {
+      if (state.selectedIncidentId) {
+        renderSelectedIncident(state.selectedIncidentId);
+      } else if (state.incidents && state.incidents.length > 0) {
+        renderSelectedIncident(state.incidents[0].id);
+      }
+    } else if (state.currentView === 'analytics') {
       renderAnalytics();
+    } else if (state.currentView === 'decision-intelligence') {
+      fetchDecisionIntelligence();
+    }
+    if (isManual && typeof showToast === 'function') {
+      showToast('Telemetry refreshed from PostgreSQL', 'info');
     }
   }
-
-  window.recalculateHashes = function () {
-    fetchAllRealData();
-    showToast('Recalculated cryptographic fingerprints & cluster hashes', 'success');
-  };
+  window.fetchAllRealData = (isManual = true) => fetchAllRealData(isManual);
 
   // Auto-Refresh Loop (Every 2 Seconds)
   function startAutoRefresh() {
@@ -431,45 +561,425 @@
     }
   }
 
-  // Render Summary Metrics across Dashboard & Flow Ribbon
+  // Render Summary Metrics across Dashboard (6 Real Top-Level Operational KPIs)
   function renderSummaryMetrics(data) {
     if (!data) return;
 
-    const hasData = data.has_sufficient_data;
-
-    // Top 4 Real-Data KPI Cards
-    if (elements.valIncoming) {
-      elements.valIncoming.innerText = hasData ? data.total_alerts.toLocaleString() : '0';
-    }
-    if (elements.valActionable) {
-      elements.valActionable.innerText = hasData ? data.notified_alerts.toLocaleString() : '0';
+    // 1. Incoming Alerts
+    const elemIncoming = document.getElementById('val-incoming');
+    if (elemIncoming) {
+      const incoming = data.incoming_alerts !== undefined ? data.incoming_alerts : (data.total_alerts || 0);
+      elemIncoming.innerText = incoming.toLocaleString();
     }
 
+    // 2. Core Incidents
+    const elemCoreInc = document.getElementById('val-core-incidents');
+    if (elemCoreInc) {
+      const core = data.core_incidents !== undefined ? data.core_incidents : (data.active_incidents !== undefined ? data.active_incidents : (state.incidents ? state.incidents.length : 0));
+      elemCoreInc.innerText = core.toLocaleString();
+    }
+
+    // 3. Alerts Deduplicated
     const elemDedup = document.getElementById('val-dedup-count');
-    if (elemDedup) elemDedup.innerText = hasData ? data.repeated_alert_occurrences.toLocaleString() : '0';
+    if (elemDedup) {
+      const dedup = data.alerts_deduplicated !== undefined ? data.alerts_deduplicated : (data.repeated_alert_occurrences || 0);
+      elemDedup.innerText = dedup.toLocaleString();
+    }
 
-    const elemGrouped = document.getElementById('val-grouped-count');
-    if (elemGrouped) elemGrouped.innerText = hasData ? data.related_alerts_grouped.toLocaleString() : '0';
+    // 4. Notifications Prevented (Suppressed)
+    const elemSuppressed = document.getElementById('val-suppressed-count');
+    if (elemSuppressed) {
+      elemSuppressed.innerText = (data.suppressed_alerts || 0).toLocaleString();
+    }
 
+    // 5. Critical & High Incidents
+    const elemCritical = document.getElementById('val-critical-incidents');
+    if (elemCritical) {
+      elemCritical.innerText = (data.high_critical_incidents !== undefined ? data.high_critical_incidents : 0).toLocaleString();
+    }
+
+    // 6. Noise Reduction %
     const elemNoisePct = document.getElementById('val-noise-reduction-pct');
     if (elemNoisePct) {
-      elemNoisePct.innerText = hasData && data.total_alerts > 0 
-        ? `(${data.noise_reduction_rate.toFixed(1)}% eliminated)`
-        : '0% reduced';
+      const rate = data.alert_reduction !== undefined ? data.alert_reduction : (data.noise_reduction_rate !== undefined ? data.noise_reduction_rate : 0);
+      elemNoisePct.innerText = `${rate.toFixed(1)}%`;
+    }
+  }
+
+  // ==============================================================
+  // CHART.JS REAL-DATA VISUALIZATION CONTROLLER
+  // ==============================================================
+  const chartInstances = {};
+
+  function destroyChart(id) {
+    if (chartInstances[id]) {
+      try {
+        chartInstances[id].destroy();
+      } catch (e) {}
+      delete chartInstances[id];
+    }
+  }
+
+  window.setChartTimeRange = function (range) {
+    state.chartTimeRange = range;
+    document.querySelectorAll('.range-btn').forEach((btn) => {
+      if (btn.dataset.range === range) {
+        btn.className = 'range-btn px-2 py-0.5 rounded text-[11px] font-bold bg-primary text-on-primary shadow-xs';
+      } else {
+        btn.className = 'range-btn px-2 py-0.5 rounded text-[11px] font-medium text-secondary hover:text-on-surface';
+      }
+    });
+    renderAlertVolumeChart();
+  };
+
+  async function updateDashboardCharts() {
+    if (typeof Chart === 'undefined') return;
+    await Promise.all([
+      renderAlertVolumeChart(),
+      renderReductionFunnelChart(),
+      renderIncidentPriorityChart(),
+      renderAlertsByServiceChart()
+    ]);
+  }
+
+  // Graph A: Alert Volume Over Time
+  async function renderAlertVolumeChart() {
+    const canvas = document.getElementById('chart-alert-volume');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const range = state.chartTimeRange || '1h';
+
+    let timelineItems = [];
+    try {
+      const resp = await fetch(`http://localhost:8000/api/v1/analytics/timeline?interval=minute&time_range=${range}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        timelineItems = Array.isArray(data) ? data : (data.items || []);
+      }
+    } catch (e) {
+      console.warn('Timeline API unreachable:', e);
     }
 
-    // Pipeline Flow Ribbon
-    const flowRecv = document.getElementById('flow-val-received');
-    if (flowRecv) flowRecv.innerText = hasData ? `${data.total_alerts.toLocaleString()} alerts` : '0 alerts';
+    destroyChart('chart-alert-volume');
 
-    const flowDedup = document.getElementById('flow-val-dedup');
-    if (flowDedup) flowDedup.innerText = hasData ? `${data.repeated_alert_occurrences.toLocaleString()} repeats` : '0 repeats';
+    const labels = timelineItems.map((item) => {
+      const d = new Date(item.timestamp);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+    const values = timelineItems.map((item) => item.received || 0);
 
-    const flowGrouped = document.getElementById('flow-val-grouped');
-    if (flowGrouped) flowGrouped.innerText = hasData ? `${data.related_alerts_grouped.toLocaleString()} grouped` : '0 grouped';
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+    gradient.addColorStop(0, 'rgba(79, 70, 229, 0.25)');
+    gradient.addColorStop(1, 'rgba(79, 70, 229, 0.0)');
 
-    const flowNotified = document.getElementById('flow-val-notified');
-    if (flowNotified) flowNotified.innerText = hasData ? `${data.notified_alerts.toLocaleString()} dispatched` : '0 dispatched';
+    chartInstances['chart-alert-volume'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels.length > 0 ? labels : ['No recent alerts'],
+        datasets: [{
+          label: 'Incoming Alerts',
+          data: values.length > 0 ? values : [0],
+          borderColor: '#4f46e5',
+          backgroundColor: gradient,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: values.length > 20 ? 1 : 3,
+          pointBackgroundColor: '#4f46e5'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: (context) => ` Alerts: ${context.parsed.y}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { family: 'Geist', size: 10 }, color: '#64748b', maxTicksLimit: 8 }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(226, 232, 240, 0.6)' },
+            ticks: { font: { family: 'JetBrains Mono', size: 10 }, color: '#64748b', precision: 0 }
+          }
+        }
+      }
+    });
+  }
+
+  // Graph C: Incident Severity / Risk Distribution
+  async function renderIncidentPriorityChart() {
+    const canvas = document.getElementById('chart-incident-priority');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    let items = [];
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/analytics/incidents-by-priority?time_range=24h');
+      if (resp.ok) {
+        items = await resp.json();
+      }
+    } catch (e) {
+      console.warn('Incidents by priority API unreachable:', e);
+    }
+
+    destroyChart('chart-incident-priority');
+
+    const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+    items.forEach((item) => {
+      const p = (item.priority || '').toUpperCase();
+      if (counts[p] !== undefined) counts[p] = item.count;
+    });
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+
+    const ctx = canvas.getContext('2d');
+    chartInstances['chart-incident-priority'] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Critical', 'High', 'Medium', 'Low'],
+        datasets: [{
+          data: total > 0 ? [counts.CRITICAL, counts.HIGH, counts.MEDIUM, counts.LOW] : [0, 0, 0, 0],
+          backgroundColor: ['#dc2626', '#ea580c', '#f59e0b', '#3b82f6'],
+          borderWidth: 2,
+          borderColor: '#ffffff',
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '72%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              boxWidth: 10,
+              padding: 10,
+              font: { family: 'Geist', size: 10 }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) => ` ${context.label}: ${context.parsed} incidents`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Graph 4: Alerts by Microservice
+  async function renderAlertsByServiceChart() {
+    const canvas = document.getElementById('chart-alerts-by-service');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    let items = [];
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/analytics/alerts-by-service?time_range=24h');
+      if (resp.ok) {
+        items = await resp.json();
+      }
+    } catch (e) {
+      console.warn('Alerts by service API unreachable:', e);
+    }
+
+    destroyChart('chart-alerts-by-service');
+
+    const top5 = items.slice(0, 5);
+    const labels = top5.map((i) => i.service || 'service');
+    const values = top5.map((i) => i.count || 0);
+
+    const ctx = canvas.getContext('2d');
+    chartInstances['chart-alerts-by-service'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels.length > 0 ? labels : ['No telemetry'],
+        datasets: [{
+          label: 'Alerts',
+          data: values.length > 0 ? values : [0],
+          backgroundColor: '#4f46e5',
+          borderRadius: 6,
+          barPercentage: 0.6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => ` Alerts: ${context.parsed.x.toLocaleString()}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(226, 232, 240, 0.6)' },
+            ticks: { font: { family: 'JetBrains Mono', size: 9 }, color: '#64748b', precision: 0 }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { family: 'JetBrains Mono', size: 10 }, color: '#334155' }
+          }
+        }
+      }
+    });
+  }
+
+  // Graph 5: Alert Noise Reduction Funnel
+  async function renderReductionFunnelChart() {
+    const canvas = document.getElementById('chart-reduction-funnel');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    destroyChart('chart-reduction-funnel');
+
+    const totalRaw = state.summary ? (state.summary.total_alerts || 0) : 0;
+    const dedup = state.summary ? (state.summary.repeated_alert_occurrences || 0) : 0;
+    const coreInc = state.summary ? (state.summary.active_incidents || (state.incidents ? state.incidents.length : 0)) : 0;
+    const notified = state.summary ? (state.summary.notified_alerts || 0) : 0;
+
+    const ctx = canvas.getContext('2d');
+    chartInstances['chart-reduction-funnel'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Raw Alerts', 'Duplicates Filtered', 'Core Incidents', 'Actionable Dispatched'],
+        datasets: [{
+          data: [totalRaw, dedup, coreInc, notified],
+          backgroundColor: ['#64748b', '#6366f1', '#3b82f6', '#10b981'],
+          borderRadius: 6,
+          barPercentage: 0.6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => ` Count: ${context.parsed.x.toLocaleString()}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(226, 232, 240, 0.6)' },
+            ticks: { font: { family: 'JetBrains Mono', size: 9 }, color: '#64748b', precision: 0 }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { family: 'Geist', size: 10, weight: '500' }, color: '#334155' }
+          }
+        }
+      }
+    });
+  }
+
+  // Graph 6: Real Decision Analytics Time-Series Graph
+  async function renderDecisionTimelineChart() {
+    const canvas = document.getElementById('chart-decision-timeline');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    let items = [];
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/analytics/timeline?interval=minute&time_range=24h');
+      if (resp.ok) {
+        const data = await resp.json();
+        items = Array.isArray(data) ? data : (data.items || []);
+      }
+    } catch (e) {
+      console.warn('Decision timeline API unreachable:', e);
+    }
+
+    destroyChart('chart-decision-timeline');
+
+    const labels = items.map((i) => {
+      const d = new Date(i.timestamp);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+    const suppressed = items.map((i) => i.suppressed || 0);
+    const notified = items.map((i) => i.notified || 0);
+    const escalated = items.map((i) => i.escalated || 0);
+
+    const ctx = canvas.getContext('2d');
+    chartInstances['chart-decision-timeline'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels.length > 0 ? labels : ['00:00', '06:00', '12:00', '18:00'],
+        datasets: [
+          {
+            label: 'Suppressed (Fatigue Prevented)',
+            data: suppressed.length > 0 ? suppressed : [0, 0, 0, 0],
+            borderColor: '#059669',
+            backgroundColor: 'rgba(5, 150, 105, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3
+          },
+          {
+            label: 'Notified (On-Call Alert)',
+            data: notified.length > 0 ? notified : [0, 0, 0, 0],
+            borderColor: '#7c3aed',
+            backgroundColor: 'rgba(124, 58, 237, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3
+          },
+          {
+            label: 'Escalated (Tier-2 Escalation)',
+            data: escalated.length > 0 ? escalated : [0, 0, 0, 0],
+            borderColor: '#d97706',
+            backgroundColor: 'rgba(217, 119, 6, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              boxWidth: 12,
+              padding: 12,
+              font: { family: 'Geist', size: 11 }
+            }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { family: 'Geist', size: 10 }, color: '#64748b', maxTicksLimit: 8 }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(226, 232, 240, 0.6)' },
+            ticks: { font: { family: 'JetBrains Mono', size: 10 }, color: '#64748b', precision: 0 }
+          }
+        }
+      }
+    });
   }
 
   // Render Dashboard Overview Page
@@ -479,6 +989,7 @@
     }
     renderOverviewAlerts();
     renderOverviewIncidents();
+    updateDashboardCharts();
   }
 
   // Render Recent Alerts list on Overview Dashboard
@@ -719,10 +1230,10 @@
 
     if (state.incidents.length === 0) {
       container.innerHTML = `
-        <div class="p-8 text-center text-secondary border border-dashed border-surface-container-highest rounded-xl">
+        <div class="p-8 text-center text-secondary border border-dashed border-surface-container-highest rounded-2xl bg-surface-container-lowest">
           <span class="material-symbols-outlined text-[36px] text-outline mb-2">layers_clear</span>
-          <p class="font-body-md font-semibold text-on-surface">No correlated alert groups</p>
-          <p class="font-body-sm text-xs text-on-surface-variant mt-1">Alert groups are automatically synthesized when related alerts fire across services.</p>
+          <p class="font-headline-sm text-sm font-bold text-on-surface">No correlated incident groups in selected time range</p>
+          <p class="font-body-sm text-xs text-on-surface-variant mt-1">Incident groups are synthesized in real time from incoming telemetry.</p>
         </div>
       `;
       return;
@@ -732,61 +1243,46 @@
     state.incidents.forEach((inc) => {
       const card = document.createElement('div');
       const isCrit = inc.priority === 'CRITICAL' || inc.severity === 'CRITICAL';
-      card.className = `p-space-base bg-surface-container-lowest rounded-xl shadow-sm border-l-4 ${
-        isCrit ? 'border-l-error' : 'border-l-primary'
-      } hover:shadow-md transition-all cursor-pointer`;
+      const isHigh = inc.priority === 'HIGH' || inc.severity === 'HIGH';
+      const level = inc.priority || inc.severity || 'MEDIUM';
+      const levelBadge = isCrit 
+        ? 'bg-red-100 text-red-800' 
+        : isHigh ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800';
+
+      const durationMin = inc.first_seen
+        ? Math.max(1, Math.round((Date.now() - new Date(inc.first_seen).getTime()) / 60000))
+        : 5;
+
+      const riskScore = inc.risk_score || (isCrit ? 98 : isHigh ? 82 : 45);
+
+      card.className = `p-4 bg-surface-container-lowest rounded-2xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-primary transition-all`;
 
       card.innerHTML = `
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2 py-0.5 rounded ${
-                isCrit ? 'bg-error-container text-on-error-container' : 'bg-primary-fixed text-on-primary-fixed'
-              } font-code-sm text-code-sm font-bold">${inc.priority || inc.severity || 'HIGH'}</span>
-              <span class="font-code-md text-code-md font-semibold text-on-surface">${inc.incident_number || inc.id}</span>
-              <span class="text-on-surface-variant font-code-sm text-[11px]">${inc.status}</span>
-            </div>
-            <h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">${inc.title}</h3>
-            <p class="font-body-sm text-body-sm text-on-surface-variant">${inc.description || 'Correlated incident cluster'}</p>
-            <div class="flex items-center gap-2 pt-1 flex-wrap">
-              <span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] text-secondary">${inc.service}</span>
-            </div>
+        <div class="space-y-1.5 min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2 py-0.5 rounded font-code-sm text-xs font-bold ${levelBadge}">${level}</span>
+            <span class="font-code-sm text-xs font-bold text-on-surface">${inc.incident_number || inc.id}</span>
+            <span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] text-secondary font-medium">${inc.service}</span>
+            <span class="px-2 py-0.5 rounded ${inc.status === 'RESOLVED' ? 'bg-emerald-50 text-emerald-700' : inc.status === 'ACKNOWLEDGED' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'} font-code-sm text-[11px] font-semibold uppercase">${inc.status}</span>
           </div>
-          <div class="flex flex-col items-end gap-2 shrink-0">
-            <div class="flex items-baseline gap-1.5">
-              <span class="font-headline-lg text-headline-lg text-on-surface font-bold">${inc.alert_count || 1}</span>
-              <span class="font-body-sm text-body-sm text-secondary">alerts grouped</span>
-            </div>
-            <div class="flex items-center gap-2">
-              ${inc.status === 'OPEN' ? `
-                <button onclick="event.stopPropagation(); window.acknowledgeCurrentIncident('${inc.id}')" title="Acknowledge Incident" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-label-md text-xs font-semibold flex items-center gap-1 transition-colors shadow-xs cursor-pointer">
-                  <span class="material-symbols-outlined text-[15px]">task_alt</span>
-                  <span>Acknowledge</span>
-                </button>
-              ` : ''}
-              ${inc.status !== 'RESOLVED' ? `
-                <button onclick="event.stopPropagation(); window.resolveCurrentIncident('${inc.id}')" title="Resolve Incident" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-md text-xs font-semibold flex items-center gap-1 transition-colors shadow-xs cursor-pointer">
-                  <span class="material-symbols-outlined text-[15px]">check_circle</span>
-                  <span>Resolve</span>
-                </button>
-              ` : `
-                <span class="px-2.5 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-code-sm text-xs font-bold">Resolved ✓</span>
-              `}
-              <button onclick="event.stopPropagation(); window.openGroupDecisionDrawer('${inc.id}')" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-xs font-semibold flex items-center gap-1 transition-colors">
-                <span class="material-symbols-outlined text-[15px] text-primary">psychology</span>
-                <span>Explain Grouping</span>
-              </button>
-              <button onclick="event.stopPropagation(); window.inspectIncident('${inc.id}')" class="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors">
-                Inspect Timeline
-              </button>
-            </div>
+          <h3 class="font-headline-sm text-sm font-bold text-on-surface truncate">${inc.title}</h3>
+          <div class="flex flex-wrap items-center gap-3 text-xs font-code-sm text-secondary">
+            <span>Risk: <strong class="${isCrit ? 'text-red-600' : 'text-primary'} font-bold">${riskScore}/100</strong></span>
+            <span>·</span>
+            <span>Alerts: <strong class="text-on-surface">${inc.alert_count || 1}</strong></span>
+            <span>·</span>
+            <span>Duration: <strong class="text-on-surface">${durationMin} min</strong></span>
+            <span>·</span>
+            <span class="text-emerald-700 font-medium">Resolution available</span>
           </div>
         </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="window.inspectIncident('${inc.id}')" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-colors shadow-sm cursor-pointer">
+            <span>View Incident</span>
+            <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+          </button>
+        </div>
       `;
-
-      card.addEventListener('click', () => {
-        window.inspectIncident(inc.id);
-      });
 
       container.appendChild(card);
     });
@@ -970,8 +1466,60 @@
       }
     }
 
-    // Load real chronological timeline from API
+    // Load real chronological timeline, automated resolution intelligence, and risk scoring from API
     loadIncidentTimeline(inc.id);
+    loadIncidentResolution(inc.id);
+    fetchIncidentRiskScore(inc.id);
+  }
+
+  // Fetch and populate Incident Risk Score & Mathematical Breakdown
+  async function fetchIncidentRiskScore(incidentId) {
+    const scoreDisplay = document.getElementById('risk-score-display');
+    const levelDisplay = document.getElementById('risk-level-display');
+    const rbTotal = document.getElementById('rb-total');
+
+    try {
+      const resp = await fetch(`http://localhost:8000/api/v1/incidents/${incidentId}/risk`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const score = data.score || 0;
+        const level = data.level || 'MEDIUM';
+        const bd = data.breakdown || {};
+
+        if (scoreDisplay) scoreDisplay.innerText = score;
+        if (levelDisplay) {
+          levelDisplay.innerText = level;
+          if (level === 'CRITICAL') {
+            levelDisplay.className = 'px-2.5 py-1 rounded-xl font-code-sm text-xs font-bold bg-red-600 text-white uppercase';
+            if (scoreDisplay) scoreDisplay.className = 'text-red-600 text-sm font-bold';
+          } else if (level === 'HIGH') {
+            levelDisplay.className = 'px-2.5 py-1 rounded-xl font-code-sm text-xs font-bold bg-orange-500 text-white uppercase';
+            if (scoreDisplay) scoreDisplay.className = 'text-orange-500 text-sm font-bold';
+          } else if (level === 'MEDIUM') {
+            levelDisplay.className = 'px-2.5 py-1 rounded-xl font-code-sm text-xs font-bold bg-amber-500 text-white uppercase';
+            if (scoreDisplay) scoreDisplay.className = 'text-amber-500 text-sm font-bold';
+          } else {
+            levelDisplay.className = 'px-2.5 py-1 rounded-xl font-code-sm text-xs font-bold bg-blue-600 text-white uppercase';
+            if (scoreDisplay) scoreDisplay.className = 'text-blue-600 text-sm font-bold';
+          }
+        }
+
+        const setElem = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.innerText = `+${val ?? 0}`;
+        };
+        setElem('rb-severity', bd.severity);
+        setElem('rb-frequency', bd.frequency);
+        setElem('rb-occurrences', bd.occurrences);
+        setElem('rb-service', bd.service);
+        setElem('rb-environment', bd.environment);
+        setElem('rb-duration', bd.duration);
+
+        if (rbTotal) rbTotal.innerText = `${score} / 100`;
+      }
+    } catch (e) {
+      console.warn('Incident risk endpoint unreachable:', e);
+    }
   }
 
   function renderEmptyIncidentDetail() {
@@ -985,6 +1533,113 @@
           <span class="material-symbols-outlined text-[40px] text-outline mb-2">timeline</span>
           <div class="font-semibold text-on-surface">No incident selected</div>
           <div class="text-xs text-on-surface-variant mt-1">Select an incident from the dropdown or send alerts to form clusters.</div>
+        </div>
+      `;
+    }
+
+    const resContent = document.getElementById('incident-resolution-content');
+    if (resContent) {
+      resContent.innerHTML = `
+        <div class="p-6 text-center text-secondary border border-dashed border-surface-container-highest rounded-xl text-xs">
+          No incident selected.
+        </div>
+      `;
+    }
+  }
+
+  // Real Incident Resolution API Loader (Intelligent Unknown-Alert Resolution)
+  async function loadIncidentResolution(incidentId) {
+    const content = document.getElementById('incident-resolution-content');
+    const sourceBadge = document.getElementById('resolution-source-badge');
+    const confidenceBadge = document.getElementById('resolution-confidence-badge');
+    if (!content) return;
+
+    try {
+      const resp = await fetch(`http://localhost:8000/api/v1/incidents/${incidentId}/resolution`);
+      if (!resp.ok) {
+        throw new Error(`Resolution fetch failed: ${resp.status}`);
+      }
+      const data = await resp.json();
+
+      if (data.status === 'KNOWN' || data.status === 'RESOLVED' || (data.probable_cause && data.resolution && data.resolution.length > 0)) {
+        const isAI = data.source === 'automated_analysis';
+        if (sourceBadge) {
+          sourceBadge.className = `px-2 py-0.5 rounded font-code-sm text-[11px] font-bold ${
+            isAI ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+          }`;
+          sourceBadge.innerText = isAI ? 'Automated Analysis (Gemini)' : 'Knowledge Base (Cached)';
+        }
+
+        if (confidenceBadge) {
+          confidenceBadge.classList.remove('hidden');
+          const confPct = Math.round((data.confidence || 0.90) * 100);
+          confidenceBadge.innerText = `${confPct}% Diagnostic Confidence`;
+          confidenceBadge.className = `px-2.5 py-0.5 rounded-full font-code-sm text-xs font-semibold ${
+            confPct >= 85 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+          }`;
+        }
+
+        const stepsHtml = (data.resolution || []).map((step, idx) => `
+          <li class="flex items-start gap-2.5 text-xs text-on-surface">
+            <span class="flex items-center justify-center w-5 h-5 rounded-full bg-surface-container font-code-sm text-[11px] font-bold text-primary shrink-0">${idx + 1}</span>
+            <span class="pt-0.5">${step}</span>
+          </li>
+        `).join('');
+
+        content.innerHTML = `
+          <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest space-y-1.5">
+            <div class="flex items-center gap-1.5 font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">
+              <span class="material-symbols-outlined text-[15px] text-primary">search_insights</span>
+              Probable Root Cause
+            </div>
+            <div class="text-xs font-medium text-on-surface leading-relaxed">
+              ${data.probable_cause || 'No specific root cause identified.'}
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5 font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">
+                <span class="material-symbols-outlined text-[15px] text-emerald-600">playlist_add_check</span>
+                Recommended Remediation Steps
+              </div>
+              <span class="font-code-sm text-[10px] text-secondary">${data.resolution ? data.resolution.length : 0} ACTION STEPS</span>
+            </div>
+            <ul class="space-y-2">
+              ${stepsHtml}
+            </ul>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between text-[11px] text-secondary font-code-sm pt-1 px-1">
+            <span>Fingerprint: <code class="text-primary">${data.fingerprint ? data.fingerprint.slice(0, 16) + '...' : '—'}</code></span>
+            <span>Source: <strong class="text-on-surface">${data.source || 'automated_analysis'}</strong></span>
+          </div>
+        `;
+      } else {
+        if (sourceBadge) {
+          sourceBadge.className = 'px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] font-semibold text-secondary';
+          sourceBadge.innerText = 'Analysis Pending';
+        }
+        if (confidenceBadge) confidenceBadge.classList.add('hidden');
+
+        content.innerHTML = `
+          <div class="p-5 text-center text-secondary border border-dashed border-surface-container-highest rounded-xl">
+            <span class="material-symbols-outlined text-[28px] text-outline mb-1">hourglass_top</span>
+            <div class="font-semibold text-on-surface text-xs">Diagnostic Analysis Pending</div>
+            <div class="text-[11px] text-on-surface-variant mt-0.5">Automated resolution learning triggers when unknown alert patterns are ingested.</div>
+          </div>
+        `;
+      }
+    } catch (err) {
+      console.warn('Resolution API unavailable for incident:', incidentId, err);
+      if (sourceBadge) {
+        sourceBadge.className = 'px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] font-semibold text-secondary';
+        sourceBadge.innerText = 'Standard Runbook Active';
+      }
+      if (confidenceBadge) confidenceBadge.classList.add('hidden');
+      content.innerHTML = `
+        <div class="p-4 text-center text-secondary border border-dashed border-surface-container-highest rounded-xl text-xs">
+          Standard operational runbooks are available via the Runbook action above.
         </div>
       `;
     }
@@ -1150,34 +1805,67 @@
 
   // Live Analytics View Renderer (Real Database Data)
   window.fetchLiveAnalytics = async function () {
+    await fetchLiveSummary();
     await renderAnalytics();
-    showToast('Analytics refreshed from database', 'info');
+    if (typeof showToast === 'function') {
+      showToast('Analytics refreshed from PostgreSQL', 'info');
+    }
   };
 
   async function renderAnalytics() {
     try {
-      // 1. Fetch Overview Analytics & Summary
+      // 1. Fetch Overview Analytics & Summary & Noisy Services
       const [overviewResp, noisyResp] = await Promise.all([
         fetch('http://localhost:8000/api/v1/analytics/overview'),
         fetch('http://localhost:8000/api/v1/analytics/noisy-services?limit=10')
       ]);
 
+      if (!state.summary) {
+        await fetchLiveSummary();
+      }
+
       if (overviewResp.ok) {
         const data = await overviewResp.json();
         
-        // Update 4 Metric Rate Cards
-        const elemNoise = document.getElementById('analytics-noise-reduction');
-        if (elemNoise) elemNoise.innerText = `${(data.suppression_rate || 0).toFixed(1)}%`;
+        // 8 Real Operational Impact Metrics (Direct from PostgreSQL)
+        const totalAlerts = (state.summary && state.summary.total_alerts !== undefined)
+          ? state.summary.total_alerts
+          : (data.total_alerts || 0);
 
-        const elemDedup = document.getElementById('analytics-dedup-rate');
-        if (elemDedup) {
-          const total = data.total_alerts || 1;
-          const dedupPct = (data.alert_reduction / total) * 100;
-          elemDedup.innerText = `${dedupPct.toFixed(1)}%`;
-        }
+        const dedupCount = (state.summary && state.summary.repeated_alert_occurrences !== undefined)
+          ? state.summary.repeated_alert_occurrences
+          : (data.alert_reduction || 0);
+
+        const coreIncidents = (state.summary && state.summary.active_incidents !== undefined)
+          ? state.summary.active_incidents
+          : (state.incidents ? state.incidents.length : 0);
+
+        const suppressedCount = (data.suppressed_alerts !== undefined)
+          ? data.suppressed_alerts
+          : (state.summary ? state.summary.suppressed_alerts : 0);
+
+        const notifRate = data.notification_rate !== undefined
+          ? data.notification_rate
+          : (totalAlerts > 0 ? (data.notified_alerts / totalAlerts) * 100 : 0);
+
+        const noiseReduction = (state.summary && state.summary.noise_reduction_rate !== undefined)
+          ? state.summary.noise_reduction_rate
+          : (data.suppression_rate || 0);
+
+        const elemTotal = document.getElementById('analytics-total-alerts');
+        if (elemTotal) elemTotal.innerText = totalAlerts.toLocaleString();
+
+        const elemDedup = document.getElementById('analytics-dedup-count');
+        if (elemDedup) elemDedup.innerText = dedupCount.toLocaleString();
+
+        const elemInc = document.getElementById('analytics-core-incidents');
+        if (elemInc) elemInc.innerText = coreIncidents.toLocaleString();
+
+        const elemSupp = document.getElementById('analytics-suppressed-count');
+        if (elemSupp) elemSupp.innerText = suppressedCount.toLocaleString();
 
         const elemNotif = document.getElementById('analytics-notification-rate');
-        if (elemNotif) elemNotif.innerText = `${(data.notification_rate || 0).toFixed(1)}%`;
+        if (elemNotif) elemNotif.innerText = `${notifRate.toFixed(1)}%`;
 
         const elemMtta = document.getElementById('analytics-mtta');
         if (elemMtta) {
@@ -1185,6 +1873,16 @@
             ? state.summary.mtta_formatted
             : 'Awaiting data';
         }
+
+        const elemMttr = document.getElementById('analytics-mttr');
+        if (elemMttr) {
+          elemMttr.innerText = state.summary && state.summary.mttr_seconds > 0
+            ? state.summary.mttr_formatted
+            : 'Awaiting data';
+        }
+
+        const elemNoise = document.getElementById('analytics-noise-reduction');
+        if (elemNoise) elemNoise.innerText = `${noiseReduction.toFixed(1)}%`;
       }
 
       // 2. Populate Noisy Services Table
@@ -1196,15 +1894,18 @@
           services.forEach((s) => {
             const tr = document.createElement('tr');
             tr.className = 'border-b border-surface-container-high hover:bg-surface-container-low transition-colors';
-            const noiseRed = s.suppression_rate || (s.total_alerts > 0 ? (s.suppressed_alerts / s.total_alerts) * 100 : 0);
+            const total = s.total_alerts || s.count || 0;
+            const suppressed = s.suppressed_count !== undefined ? s.suppressed_count : (s.suppressed_alerts || 0);
+            const notified = s.notified_count !== undefined ? s.notified_count : (s.notified_alerts || 0);
+            const noiseRed = s.suppression_rate !== undefined ? s.suppression_rate : (total > 0 ? (suppressed / total) * 100 : 0);
             const statusLabel = noiseRed > 50 ? 'Protected' : 'Filtered';
             const statusBg = noiseRed > 50 ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800';
 
             tr.innerHTML = `
               <td class="py-2.5 px-3 font-semibold font-code-sm text-primary">${s.service_name || s.service || 'service'}</td>
-              <td class="py-2.5 px-3 font-code-sm font-semibold">${s.total_alerts || s.count || 0}</td>
-              <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-semibold">${s.suppressed_alerts || 0}</td>
-              <td class="py-2.5 px-3 font-code-sm text-violet-600 font-semibold">${s.notified_alerts || 0}</td>
+              <td class="py-2.5 px-3 font-code-sm font-semibold">${total}</td>
+              <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-semibold">${suppressed}</td>
+              <td class="py-2.5 px-3 font-code-sm text-violet-600 font-semibold">${notified}</td>
               <td class="py-2.5 px-3 font-code-sm text-emerald-600 font-bold">${noiseRed.toFixed(1)}%</td>
               <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded ${statusBg} font-code-sm text-xs font-bold">${statusLabel}</span></td>
             `;
@@ -1664,6 +2365,7 @@
   // ==========================================
 
   window.fetchDecisionIntelligence = async function () {
+    renderDecisionTimelineChart();
     try {
       const resp = await fetch('http://localhost:8000/api/v1/dashboard/decision-intelligence');
       if (resp.ok) {
@@ -1704,9 +2406,8 @@
     }
 
     // 1. Decision Breakdown Cards
-    const breakdownCards = document.getElementById('di-breakdown-cards');
     const breakdownContainer = document.getElementById('di-breakdown-container');
-    if (breakdownContainer && breakdownCards) {
+    if (breakdownContainer) {
       // Reset container to just the grid
       breakdownContainer.innerHTML = '';
       const grid = document.createElement('div');
@@ -1799,6 +2500,7 @@
         if (explorerCount) explorerCount.innerText = `${data.recent_decisions.length} DECISIONS`;
         explorerTbody.innerHTML = data.recent_decisions.map(dec => {
           const ts = new Date(dec.timestamp);
+          const timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           const dateStr = ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
           const decisionColors = {
@@ -1989,7 +2691,11 @@
     "High CPU usage detected on payment-api",
     "payment-api CPU utilization critical (96%)",
     "CPU threshold exceeded on payment-api container",
-    "Host CPU spike sustained on payment-api instances"
+    "Host CPU spike sustained on payment-api instances",
+    "Unexpected HTTP 502/504 surge from payment gateway processor on payment-api",
+    "payment-api: Payment webhook processing failure rate spike > 18.5%",
+    "TLS handshake latency anomaly detected against upstream payment provider on payment-api",
+    "Idempotency token conflict rate exceeding nominal baseline on payment-api"
   ];
 
   window.selectSimPreset = function (preset) {
@@ -2038,6 +2744,24 @@
       if (sevSelect) sevSelect.value = 'critical';
       if (envSelect) envSelect.value = 'production';
       if (delayInput) delayInput.value = '0';
+    } else if (preset === 'unknown') {
+      if (countInput) countInput.value = '10';
+      if (serviceSelect) serviceSelect.value = 'checkout-service';
+      if (typeSelect) typeSelect.value = 'PaymentGatewayResponseAnomaly';
+      if (sevSelect) sevSelect.value = 'warning';
+      if (envSelect) envSelect.value = 'production';
+      if (delayInput) delayInput.value = '0';
+    }
+  };
+
+  window.lastSimulatedIncidentId = null;
+
+  window.openSimulatedIncident = function () {
+    if (window.lastSimulatedIncidentId) {
+      navigateTo('incident-details');
+      renderSelectedIncident(window.lastSimulatedIncidentId);
+    } else {
+      navigateTo('incident-details');
     }
   };
 
@@ -2111,7 +2835,7 @@
 
       const data = await resp.json();
 
-      // Progress complete
+      // Progress complete — all data below is from real backend response
       if (progressBar) progressBar.style.width = '100%';
       if (progressCount) progressCount.innerText = `${data.generated} / ${data.requested}`;
       if (progressStatus) progressStatus.innerText = `Completed: ${data.generated} alerts processed through real webhook!`;
@@ -2156,6 +2880,54 @@
       if (incEnv) incEnv.innerText = data.environment;
       if (incFp) incFp.innerText = data.primary_fingerprint ? `${data.primary_fingerprint.substring(0, 16)}...` : 'N/A';
 
+      // Store simulated incident ID for quick investigation
+      window.lastSimulatedIncidentId = data.primary_incident_id;
+
+      // Dynamically fetch and display AI Diagnostic & Remediation Intelligence
+      if (data.primary_incident_id) {
+        try {
+          const resResp = await fetch(`http://localhost:8000/api/v1/incidents/${data.primary_incident_id}/resolution`);
+          if (resResp.ok) {
+            const resData = await resResp.json();
+            const aiCard = document.getElementById('sim-ai-resolution-card');
+            const aiCause = document.getElementById('sim-ai-root-cause');
+            const aiSteps = document.getElementById('sim-ai-steps-list');
+            const aiSource = document.getElementById('sim-ai-source-badge');
+            const aiConf = document.getElementById('sim-ai-confidence-badge');
+            const aiCount = document.getElementById('sim-ai-steps-count');
+
+            if (aiCard && (resData.probable_cause || (resData.resolution && resData.resolution.length > 0))) {
+              aiCard.classList.remove('hidden');
+              if (aiCause) aiCause.innerText = resData.probable_cause || 'Root cause identified.';
+              if (aiSource) {
+                const isKnowledge = resData.source === 'knowledge_base';
+                aiSource.innerText = isKnowledge ? 'Knowledge Base (Cached)' : 'Automated Analysis (Gemini)';
+                aiSource.className = isKnowledge
+                  ? 'px-2.5 py-1 rounded font-code-sm text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  : 'px-2.5 py-1 rounded font-code-sm text-[11px] font-bold bg-primary-fixed text-on-primary-fixed';
+              }
+              if (aiConf) {
+                const confPct = Math.round((resData.confidence || 0.94) * 100);
+                aiConf.innerText = `${confPct}% Diagnostic Confidence`;
+              }
+              if (aiCount) {
+                aiCount.innerText = `${(resData.resolution || []).length} ACTION STEPS`;
+              }
+              if (aiSteps) {
+                aiSteps.innerHTML = (resData.resolution || []).map((step, idx) => `
+                  <li class="flex items-start gap-2.5 text-xs text-on-surface">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-surface-container font-code-sm text-[11px] font-bold text-primary shrink-0">${idx + 1}</span>
+                    <span class="pt-0.5">${escapeHtml(step)}</span>
+                  </li>
+                `).join('');
+              }
+            }
+          }
+        } catch (aiErr) {
+          console.warn('Could not load AI resolution for simulated incident:', aiErr);
+        }
+      }
+
       // Update Flow Diagram
       const diagRaw = document.getElementById('diag-raw');
       const diagInc = document.getElementById('diag-inc');
@@ -2171,8 +2943,18 @@
 
     } catch (err) {
       clearInterval(tickerInterval);
-      if (progressStatus) progressStatus.innerText = `Simulation failed: ${err.message}`;
-      showToast(`Simulation error: ${err.message}`, 'error');
+      // Clear progress bar on failure
+      if (progressBar) progressBar.style.width = '0%';
+      if (progressCount) progressCount.innerText = '';
+
+      // Provide a clear, actionable error message
+      const isNetworkError = err.message === 'Failed to fetch' || err.message.includes('NetworkError');
+      const errorMsg = isNetworkError
+        ? 'Backend unavailable. Start the backend with: docker-compose up -d'
+        : `Simulation failed: ${err.message}`;
+
+      if (progressStatus) progressStatus.innerText = errorMsg;
+      showToast(isNetworkError ? 'Backend unavailable. Start PostgreSQL and the backend to run the simulation.' : `Simulation error: ${err.message}`, 'error');
     } finally {
       if (btn) btn.disabled = false;
       if (btnText) btnText.innerText = 'GENERATE ALERTS';

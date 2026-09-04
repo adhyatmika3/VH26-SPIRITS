@@ -48,6 +48,7 @@ class Incident(Base):
 
     # Phase 3 Lifecycle & Escalation Tracking
     escalation_level: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    resolution_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="PENDING")
     last_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     acknowledged_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

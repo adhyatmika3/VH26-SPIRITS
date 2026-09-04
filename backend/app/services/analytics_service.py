@@ -10,6 +10,7 @@ from app.models.notification_record import NotificationRecord
 from app.schemas.analytics import (
     AnalyticsOverviewResponse,
     SeverityDistributionItem,
+    IncidentPriorityDistributionItem,
     SourceDistributionItem,
     ServiceDistributionItem,
     NoisyServiceItem,
@@ -26,7 +27,7 @@ def parse_time_range(
     end_time: Optional[datetime] = None
 ) -> Tuple[Optional[datetime], Optional[datetime]]:
     """
-    Parses time_range ('1h', '24h', '7d', '30d') or explicit start_time and end_time.
+    Parses time_range ('15m', '1h', '6h', '24h', '7d', '30d') or explicit start_time and end_time.
     Returns timezone-aware UTC datetime boundaries.
     """
     now = datetime.now(timezone.utc)
@@ -43,8 +44,12 @@ def parse_time_range(
         return None, None
 
     range_clean = time_range.strip().lower()
-    if range_clean == "1h":
+    if range_clean in ("15m", "15min"):
+        return now - timedelta(minutes=15), now
+    elif range_clean == "1h":
         return now - timedelta(hours=1), now
+    elif range_clean in ("6h", "6hr"):
+        return now - timedelta(hours=6), now
     elif range_clean in ("24h", "1d"):
         return now - timedelta(hours=24), now
     elif range_clean == "7d":
@@ -152,6 +157,35 @@ def get_alerts_by_severity(
             percentage=round((r.count / total_count * 100.0), 2)
         )
         for r in results
+    ]
+
+
+def get_incidents_by_priority(
+    db: Session,
+    time_range: Optional[str] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None
+) -> List[IncidentPriorityDistributionItem]:
+    start_dt, end_dt = parse_time_range(time_range, start_time, end_time)
+
+    query = db.query(Incident.priority, func.count(Incident.id).label("count"))
+    if start_dt:
+        query = query.filter(Incident.created_at >= start_dt)
+    if end_dt:
+        query = query.filter(Incident.created_at <= end_dt)
+
+    results = query.group_by(Incident.priority).all()
+    counts = {r[0].upper() if r[0] else "LOW": int(r[1]) for r in results}
+    total_count = sum(counts.values()) or 0
+
+    order = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    return [
+        IncidentPriorityDistributionItem(
+            priority=p,
+            count=counts.get(p, 0),
+            percentage=round((counts.get(p, 0) / total_count * 100.0), 2) if total_count > 0 else 0.0
+        )
+        for p in order
     ]
 
 

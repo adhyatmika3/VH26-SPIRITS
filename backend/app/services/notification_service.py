@@ -4,13 +4,17 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.metrics import record_notification_metric, record_notification_duration
+from app.core.metrics import (
+    record_notification_metric,
+    record_notification_duration,
+    record_slack_metric
+)
 from app.models.canonical_alert import CanonicalAlert
 from app.models.incident import Incident
 from app.models.decision_record import DecisionRecord
 from app.models.notification_record import NotificationRecord
 import app.services.slack_notifier as slack_notifier
-
+import app.services.email_notifier as email_notifier
 
 
 def dispatch_notification(
@@ -22,55 +26,175 @@ def dispatch_notification(
     channel: str = "slack"
 ) -> NotificationRecord:
     """
-    Dispatches notification via designated channel, updates incident.last_notified_at,
+    Dispatches notification via designated channel ('email' or 'slack'), updates incident.last_notified_at,
     records sanitized NotificationRecord in database, and records Prometheus metrics.
+    Enforces incident-level idempotency to prevent duplicate notifications for the same incident.
     """
     now = datetime.now(timezone.utc)
-    env = (canonical_alert.labels.get("environment") or "production") if canonical_alert else "production"
+    env = (canonical_alert.labels.get("environment") or canonical_alert.labels.get("env") or "production") if canonical_alert and canonical_alert.labels else "production"
     sev = canonical_alert.severity if canonical_alert else incident.priority
     priority = canonical_alert.priority if canonical_alert else incident.priority
     alert_name = canonical_alert.alert_name if canonical_alert else incident.title
     occ_count = canonical_alert.occurrence_count if canonical_alert else incident.alert_count
 
-    # 1. Build channel payload
-    raw_payload = slack_notifier.build_slack_blocks(
-        notification_type=notification_type,
-        incident_number=incident.incident_number,
-        service=incident.service,
-        alert_name=alert_name,
-        severity=sev,
-        priority=priority,
-        environment=env,
-        occurrence_count=occ_count,
-        reason_codes=decision_record.reason_codes,
-        reason=decision_record.reason,
-        escalation_level=incident.escalation_level
-    )
+    snapshot = decision_record.context_snapshot or {}
+    probable_cause = snapshot.get("probable_cause")
+    resolution_steps = snapshot.get("resolution_steps")
+    risk_score = snapshot.get("risk_score")
+    risk_level = snapshot.get("risk_level")
 
-    # 2. Dispatch
-    start_notif = time.perf_counter()
-    result = slack_notifier.send_slack_notification(payload=raw_payload)
-    notif_dur = time.perf_counter() - start_notif
-    record_notification_duration(channel=channel, duration=notif_dur)
-    status = result["status"]
-    err = result.get("error")
+    # -------------------------------------------------------------------------
+    # Channel: EMAIL (Real SMTP Escalation)
+    # -------------------------------------------------------------------------
+    if channel == "email":
+        # Check idempotency: if an email was already successfully SENT for this incident, prevent duplicate
+        existing_sent = (
+            db.query(NotificationRecord)
+            .filter(
+                NotificationRecord.incident_id == incident.id,
+                NotificationRecord.channel == "email",
+                NotificationRecord.status == "SENT"
+            )
+            .first()
+        )
+        if existing_sent:
+            logger.info(
+                f"Skipping duplicate email notification for incident [{incident.incident_number}]: "
+                f"Notification [{existing_sent.id}] was already SENT."
+            )
+            return existing_sent
 
-    # 3. Update Incident last_notified_at if successfully dispatched/simulated
+        # Format duration string
+        def _to_utc(dt: Optional[datetime]) -> datetime:
+            if dt is None:
+                return now
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+
+        start_ts = _to_utc(incident.first_seen)
+        end_ts = _to_utc(incident.last_seen)
+        dur_sec = max(0.0, (end_ts - start_ts).total_seconds())
+        dur_str = f"{int(dur_sec)}s" if dur_sec < 60 else f"{int(dur_sec // 60)}m {int(dur_sec % 60)}s"
+
+        alert_type = (
+            (canonical_alert.labels.get("alert_type") or canonical_alert.labels.get("type"))
+            if canonical_alert and canonical_alert.labels
+            else alert_name
+        )
+
+        start_notif = time.perf_counter()
+        result = email_notifier.send_email_notification(
+            incident_number=incident.incident_number,
+            incident_id=str(incident.id),
+            service=incident.service,
+            alert_type=alert_type,
+            severity=sev,
+            priority=priority,
+            environment=env,
+            occurrence_count=occ_count,
+            risk_score=risk_score,
+            risk_level=risk_level,
+            first_seen=incident.first_seen,
+            last_seen=incident.last_seen,
+            duration_str=dur_str,
+            reason=decision_record.reason,
+            reason_codes=decision_record.reason_codes,
+            probable_cause=probable_cause,
+            resolution_steps=resolution_steps
+        )
+        notif_dur = time.perf_counter() - start_notif
+        record_notification_duration(channel=channel, duration=notif_dur)
+
+        status = result["status"]
+        err = result.get("error")
+        destination = result["destination"]
+        clean_payload = result["payload"]
+
+    # -------------------------------------------------------------------------
+    # Channel: SLACK
+    # -------------------------------------------------------------------------
+    else:
+        # Check idempotency: if a Slack notification was already successfully SENT for this incident, prevent duplicate
+        existing_sent = (
+            db.query(NotificationRecord)
+            .filter(
+                NotificationRecord.incident_id == incident.id,
+                NotificationRecord.channel == "slack",
+                NotificationRecord.status == "SENT"
+            )
+            .first()
+        )
+        if existing_sent and notification_type not in ["RESOLUTION", "MANUAL"]:
+            record_slack_metric(status="duplicate")
+            logger.info(
+                f"Slack notification duplicate skipped: incident_id={incident.id}, "
+                f"incident_number={incident.incident_number}, previous_notification_id={existing_sent.id}"
+            )
+            return existing_sent
+
+        target_channel = settings.SLACK_CHANNEL_ID or settings.SLACK_CHANNEL
+        logger.info(
+            f"Slack notification started: incident_id={incident.id}, "
+            f"incident_number={incident.incident_number}, type={notification_type}, destination={target_channel}"
+        )
+
+        dedup_val = max(0, incident.alert_count - incident.unique_alerts_count) if incident.alert_count > 0 else 0
+        fps_val = incident.unique_alerts_count or 1
+
+        raw_payload = slack_notifier.build_slack_blocks(
+            notification_type=notification_type,
+            incident_number=incident.incident_number,
+            service=incident.service,
+            alert_name=alert_name,
+            severity=sev,
+            priority=priority,
+            environment=env,
+            occurrence_count=occ_count,
+            reason_codes=decision_record.reason_codes,
+            reason=decision_record.reason,
+            incident_id=str(incident.id),
+            decision_id=str(decision_record.id),
+            decision=decision_record.decision,
+            risk_score=risk_score,
+            risk_level=risk_level,
+            dedup_count=dedup_val,
+            unique_fingerprints=fps_val,
+            escalation_level=incident.escalation_level,
+            probable_cause=probable_cause,
+            resolution_steps=resolution_steps
+        )
+
+        start_notif = time.perf_counter()
+        result = slack_notifier.send_slack_notification(payload=raw_payload)
+        notif_dur = time.perf_counter() - start_notif
+        record_notification_duration(channel=channel, duration=notif_dur)
+
+        status = result["status"]
+        err = result.get("error")
+        destination = result.get("channel") or target_channel
+        clean_payload = slack_notifier.sanitize_payload(raw_payload)
+        if result.get("ts"):
+            clean_payload["slack_ts"] = result["ts"]
+
+        record_slack_metric(status=status.lower(), duration_sec=notif_dur)
+        if status == "SENT":
+            logger.info(f"Slack notification sent: incident_id={incident.id}, incident_number={incident.incident_number}, destination={destination}")
+        else:
+            logger.warning(f"Slack notification failed: incident_id={incident.id}, incident_number={incident.incident_number}, error={err}")
+
+    # 3. Update Incident last_notified_at if successfully dispatched
     if status == "SENT":
         incident.last_notified_at = now
         db.add(incident)
 
-    # 4. Sanitize payload for persistent audit
-    clean_payload = slack_notifier.sanitize_payload(raw_payload)
-
-
-    # 5. Create NotificationRecord
+    # 4. Create NotificationRecord in PostgreSQL
     notif_record = NotificationRecord(
         decision_id=decision_record.id,
         incident_id=incident.id,
         canonical_alert_id=canonical_alert.id if canonical_alert else None,
         channel=channel,
-        destination=settings.SLACK_CHANNEL,
+        destination=destination,
         notification_type=notification_type,
         status=status,
         payload=clean_payload,
@@ -80,7 +204,7 @@ def dispatch_notification(
     db.add(notif_record)
     db.flush()
 
-    # 6. Record Prometheus metrics
+    # 5. Record Prometheus metrics
     record_notification_metric(
         channel=channel,
         success=(status == "SENT"),
@@ -90,7 +214,7 @@ def dispatch_notification(
 
     logger.info(
         f"Notification [{notif_record.id}] for incident [{incident.incident_number}] "
-        f"dispatched to {channel} with status [{status}]"
+        f"dispatched to {channel} [{destination}] with status [{status}]"
     )
 
     return notif_record

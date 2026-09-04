@@ -111,26 +111,7 @@ def evaluate_alert_decision(
         )
 
     # -------------------------------------------------------------------------
-    # 4. Active Cooldown Window Check
-    # -------------------------------------------------------------------------
-    seconds_since_notification = (now - last_notified).total_seconds()
-    is_cooldown_active = seconds_since_notification < settings.ALERT_COOLDOWN_SECONDS
-
-    if is_cooldown_active:
-        reason_codes = ["COOLDOWN_ACTIVE"]
-        if is_duplicate:
-            reason_codes.insert(0, "DUPLICATE_ALERT")
-        else:
-            reason_codes.insert(0, "CORRELATED_INCIDENT_ACTIVE")
-
-        return DecisionOutcome(
-            decision="SUPPRESS",
-            reason_codes=reason_codes,
-            reason=f"Alert suppressed under active cooldown ({int(seconds_since_notification)}s / {settings.ALERT_COOLDOWN_SECONDS}s) for incident [{incident.incident_number}]."
-        )
-
-    # -------------------------------------------------------------------------
-    # 5. Escalation Threshold Check (Unresolved Critical Incidents)
+    # 4. Escalation Threshold Check (Unresolved Critical Incidents / Velocity Burst)
     # -------------------------------------------------------------------------
     incident_age_seconds = (now - first_seen).total_seconds() if first_seen else 0.0
     is_unresolved = incident.status in ["OPEN", "ACKNOWLEDGED"]
@@ -164,6 +145,25 @@ def evaluate_alert_decision(
                 reason=f"Incident [{incident.incident_number}] is already escalated at Level {incident.escalation_level}. Skipping duplicate escalation.",
                 is_idempotent_skip=True
             )
+
+    # -------------------------------------------------------------------------
+    # 5. Active Cooldown Window Check
+    # -------------------------------------------------------------------------
+    seconds_since_notification = (now - last_notified).total_seconds()
+    is_cooldown_active = seconds_since_notification < settings.ALERT_COOLDOWN_SECONDS
+
+    if is_cooldown_active:
+        reason_codes = ["COOLDOWN_ACTIVE"]
+        if is_duplicate:
+            reason_codes.insert(0, "DUPLICATE_ALERT")
+        else:
+            reason_codes.insert(0, "CORRELATED_INCIDENT_ACTIVE")
+
+        return DecisionOutcome(
+            decision="SUPPRESS",
+            reason_codes=reason_codes,
+            reason=f"Alert suppressed under active cooldown ({int(seconds_since_notification)}s / {settings.ALERT_COOLDOWN_SECONDS}s) for incident [{incident.incident_number}]."
+        )
 
     # -------------------------------------------------------------------------
     # 6. Default Fatigue Suppression for Correlated In-Flight Alerts

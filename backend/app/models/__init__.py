@@ -5,6 +5,7 @@ from app.models.canonical_alert import CanonicalAlert
 from app.models.decision_record import DecisionRecord
 from app.models.notification_record import NotificationRecord
 from app.models.escalation_record import EscalationRecord
+from app.models.resolution_knowledge import ResolutionKnowledge
 
 __all__ = [
     "Base",
@@ -13,6 +14,7 @@ __all__ = [
     "CanonicalAlert",
     "DecisionRecord",
     "NotificationRecord",
-    "EscalationRecord"
+    "EscalationRecord",
+    "ResolutionKnowledge"
 ]
 

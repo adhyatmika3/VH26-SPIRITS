@@ -91,9 +91,28 @@ def calculate_dashboard_summary(db: Session) -> DashboardSummaryResponse:
     ).scalar() or 0
     notified_alerts = int(notified_alerts)
 
-    # 7. Active Incidents (OPEN or ACKNOWLEDGED)
+    # 7. Core and Active Incidents
+    # Core Incidents are distinct actionable problem groups (incidents requiring engineer attention, not suppressed noise)
+    total_incidents = db.execute(select(func.count(Incident.id))).scalar() or 0
+    actionable_incidents = db.execute(
+        select(func.count(Incident.id)).where(
+            (Incident.priority.notin_(["LOW", "INFORMATIONAL"])) |
+            (Incident.last_notified_at.isnot(None))
+        )
+    ).scalar() or 0
+    core_incidents = int(actionable_incidents) if actionable_incidents > 0 else int(total_incidents)
+
     active_incidents = db.execute(
         select(func.count(Incident.id)).where(Incident.status.in_(["OPEN", "ACKNOWLEDGED"]))
+    ).scalar() or 0
+    active_incidents = int(active_incidents)
+
+    # 7b. Critical & High Active Incidents
+    high_critical_incidents = db.execute(
+        select(func.count(Incident.id)).where(
+            Incident.status.in_(["OPEN", "ACKNOWLEDGED"]),
+            Incident.priority.in_(["HIGH", "CRITICAL"])
+        )
     ).scalar() or 0
 
     # 8. Active Deduplication Pool (distinct active fingerprints)
@@ -101,11 +120,12 @@ def calculate_dashboard_summary(db: Session) -> DashboardSummaryResponse:
         select(func.count(func.distinct(CanonicalAlert.fingerprint))).where(CanonicalAlert.status != "RESOLVED")
     ).scalar() or 0
 
-    # 9. Noise Reduction Rate
+    # 9. Alert Reduction % / Noise Reduction Rate
+    # Formula: ((Incoming Alerts - Core Incidents) / Incoming Alerts) * 100
     if total_alerts > 0:
-        noise_reduction_rate = round((suppressed_alerts / total_alerts) * 100.0, 1)
+        alert_reduction_rate = round(max(0.0, (total_alerts - core_incidents) / total_alerts * 100.0), 1)
     else:
-        noise_reduction_rate = 0.0
+        alert_reduction_rate = 0.0
 
     # 10. MTTA (Average Time to Acknowledge) — from actual incident records
     ack_incidents = db.execute(
@@ -159,7 +179,7 @@ def calculate_dashboard_summary(db: Session) -> DashboardSummaryResponse:
     before_after = BeforeAfterMetrics(
         without_platform_interruptions=total_alerts,
         with_platform_notifications=notified_alerts,
-        noise_reduction_percent=noise_reduction_rate,
+        noise_reduction_percent=alert_reduction_rate,
         estimated_attention_avoided_hours=estimated_attention_avoided_hours,
         handling_time_assumption_minutes=ASSUMED_HANDLING_TIME_MINUTES,
         mtta_seconds=mtta_seconds,
@@ -168,13 +188,18 @@ def calculate_dashboard_summary(db: Session) -> DashboardSummaryResponse:
 
     return DashboardSummaryResponse(
         total_alerts=total_alerts,
+        incoming_alerts=total_alerts,
         unique_canonical_alerts=unique_canonical_alerts,
         repeated_alert_occurrences=repeated_alert_occurrences,
+        alerts_deduplicated=repeated_alert_occurrences,
         related_alerts_grouped=related_alerts_grouped,
         suppressed_alerts=suppressed_alerts,
         notified_alerts=notified_alerts,
         active_incidents=int(active_incidents),
-        noise_reduction_rate=noise_reduction_rate,
+        core_incidents=int(core_incidents),
+        high_critical_incidents=int(high_critical_incidents),
+        noise_reduction_rate=alert_reduction_rate,
+        alert_reduction=alert_reduction_rate,
         mtta_seconds=mtta_seconds,
         mtta_formatted=mtta_formatted,
         mttr_seconds=mttr_seconds,
@@ -225,6 +250,12 @@ def _determine_confidence_label(decision_type: str, reasons: list) -> tuple:
 
     elif decision_type == "ESCALATE":
         evidence.append("Acknowledgement SLA threshold exceeded")
+        evidence.append("Incident escalated to Tier-2 response team")
+        return "High", evidence
+
+    # Fallback
+    return "Medium" if reasons else "Low", evidence
+
 def explain_decision(decision: DecisionRecord, alert: Optional[CanonicalAlert] = None) -> DecisionExplanationResponse:
     """
     Translates technical DecisionRecord fields into clear, human-intelligible
@@ -602,17 +633,20 @@ def assemble_incident_timeline(incident: Incident) -> IncidentTimelineResponse:
     # 7. Escalations
     if incident.escalations:
         for esc in incident.escalations:
-            esc_time = esc.escalated_at or esc.created_at
+            esc_time = getattr(esc, "created_at", None) or incident.created_at
+            esc_level = getattr(esc, "escalation_level", None) or getattr(esc, "to_level", 1)
+            reason_codes = getattr(esc, "reason_codes", None)
+            rule_str = getattr(esc, "rule_triggered", None) or (reason_codes[0] if reason_codes else "THRESHOLD_EXCEEDED")
             events.append(TimelineEventItem(
                 id=f"evt-esc-{esc.id}",
                 timestamp=esc_time,
-                formatted_time=esc_time.strftime("%H:%M:%S UTC"),
+                formatted_time=esc_time.strftime("%H:%M:%S UTC") if esc_time else "Just now",
                 stage="ESCALATION",
-                label=f"Escalated to Level {esc.to_level}",
-                description=f"Escalation triggered by rule '{esc.rule_triggered}': {esc.reason}",
+                label=f"Escalated to Level {esc_level}",
+                description=f"Escalation triggered by rule '{rule_str}': {esc.reason}",
                 status="completed",
                 actor="Escalation Service",
-                metadata={"level": esc.to_level, "rule": esc.rule_triggered}
+                metadata={"level": esc_level, "rule": rule_str}
             ))
 
     # 8. Resolution

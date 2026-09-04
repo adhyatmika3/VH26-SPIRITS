@@ -8,8 +8,10 @@ from app.models.incident import Incident
 from app.models.canonical_alert import CanonicalAlert
 from app.models.decision_record import DecisionRecord
 from app.models.notification_record import NotificationRecord
+from app.models.raw_alert import RawAlert
 from app.schemas.webhook import AlertWebhookPayload
 from app.services.alert_processor import process_alert_pipeline
+from app.services.dashboard_service import calculate_dashboard_summary
 
 
 def test_dashboard_summary_empty(client: TestClient):
@@ -259,6 +261,125 @@ def test_incident_timeline(client: TestClient, db_session: Session):
     # Check chronological ordering
     timestamps = [e["timestamp"] for e in events]
     assert timestamps == sorted(timestamps)
+
+
+def test_alert_reduction_metric_cases(client: TestClient, db_session: Session):
+    """
+    Verify Alert Reduction % calculation:
+    Formula: ((Incoming Alerts - Core Incidents) / Incoming Alerts) * 100
+    Covers:
+    - 0 incoming alerts -> 0.0% (safe division by zero)
+    - 1 alert, 1 incident -> 0.0%
+    - 100 alerts, 10 incidents -> 90.0%
+    - 100 alerts, 1 incident -> 99.0%
+    - 500 incoming alerts, 1 core incident, 499 deduplicated -> 99.8%
+    """
+    # 1. Zero alerts (empty DB)
+    db_session.query(RawAlert).delete()
+    db_session.query(Incident).delete()
+    db_session.query(CanonicalAlert).delete()
+    db_session.query(DecisionRecord).delete()
+    db_session.query(NotificationRecord).delete()
+    db_session.commit()
+
+    summary0 = calculate_dashboard_summary(db_session)
+    assert summary0.alert_reduction == 0.0
+    assert summary0.noise_reduction_rate == 0.0
+
+    # Helper to populate test data
+    def set_counts(total_raw: int, total_incidents: int, dedup_occurrences: int = 0):
+        db_session.query(RawAlert).delete()
+        db_session.query(Incident).delete()
+        db_session.query(CanonicalAlert).delete()
+        db_session.query(DecisionRecord).delete()
+        db_session.query(NotificationRecord).delete()
+        
+        now = datetime.now(timezone.utc)
+        for i in range(total_raw):
+            db_session.add(RawAlert(
+                source="test",
+                alert_name="CPU_HIGH",
+                service="test-svc",
+                severity="critical",
+                status="firing",
+                timestamp=now,
+                raw_payload={"msg": f"alert {i}"},
+                received_at=now
+            ))
+        for j in range(total_incidents):
+            db_session.add(Incident(
+                incident_number=f"INC-TEST-CASE-{j}",
+                title=f"Incident {j}",
+                service="test-svc",
+                priority="CRITICAL",
+                status="OPEN",
+                first_seen=now
+            ))
+        if dedup_occurrences > 0:
+            raw_first = db_session.query(RawAlert).first()
+            raw_id = raw_first.id if raw_first else uuid.uuid4()
+            db_session.add(CanonicalAlert(
+                raw_alert_id=raw_id,
+                fingerprint="fp-test-dedup-case",
+                source="test",
+                alert_name="CPU_HIGH",
+                service="test-svc",
+                severity="critical",
+                status="ACTIVE",
+                message="Test alert message",
+                timestamp=now,
+                first_seen=now,
+                last_seen=now,
+                occurrence_count=dedup_occurrences + 1
+            ))
+        db_session.commit()
+
+    # 2. 1 alert, 1 incident -> 0.0%
+    set_counts(total_raw=1, total_incidents=1)
+    s1 = calculate_dashboard_summary(db_session)
+    assert s1.total_alerts == 1
+    assert s1.incoming_alerts == 1
+    assert s1.core_incidents == 1
+    assert s1.alert_reduction == 0.0
+    assert s1.noise_reduction_rate == 0.0
+
+    # 3. 100 alerts, 10 incidents -> 90.0%
+    set_counts(total_raw=100, total_incidents=10)
+    s100_10 = calculate_dashboard_summary(db_session)
+    assert s100_10.total_alerts == 100
+    assert s100_10.core_incidents == 10
+    assert s100_10.alert_reduction == 90.0
+    assert s100_10.noise_reduction_rate == 90.0
+
+    # 4. 100 alerts, 1 incident -> 99.0%
+    set_counts(total_raw=100, total_incidents=1)
+    s100_1 = calculate_dashboard_summary(db_session)
+    assert s100_1.total_alerts == 100
+    assert s100_1.core_incidents == 1
+    assert s100_1.alert_reduction == 99.0
+    assert s100_1.noise_reduction_rate == 99.0
+
+    # 5. 500 incoming alerts, 1 core incident, 499 deduplicated -> 99.8%
+    set_counts(total_raw=500, total_incidents=1, dedup_occurrences=499)
+    s500 = calculate_dashboard_summary(db_session)
+    assert s500.total_alerts == 500
+    assert s500.incoming_alerts == 500
+    assert s500.core_incidents == 1
+    assert s500.repeated_alert_occurrences == 499
+    assert s500.alerts_deduplicated == 499
+    assert s500.alert_reduction == 99.8
+    assert s500.noise_reduction_rate == 99.8
+
+    # Verify API endpoint returns identical consistent values
+    resp = client.get("/api/v1/dashboard/summary")
+    assert resp.status_code == 200
+    api_data = resp.json()
+    assert api_data["incoming_alerts"] == 500
+    assert api_data["total_alerts"] == 500
+    assert api_data["core_incidents"] == 1
+    assert api_data["alerts_deduplicated"] == 499
+    assert api_data["alert_reduction"] == 99.8
+    assert api_data["noise_reduction_rate"] == 99.8
 
 
 

@@ -29,6 +29,8 @@ from app.services.correlation_service import correlate_and_assign_incident
 from app.services.decision_engine import evaluate_alert_decision
 from app.services.notification_service import dispatch_notification
 from app.services.escalation_service import record_incident_escalation
+from app.services.resolution_service import resolve_unknown_alert_sync, ResolutionResult
+from app.services.risk_scoring import calculate_risk
 
 
 @dataclass
@@ -44,6 +46,7 @@ class ProcessingResult:
     escalation_level: int
     decision_record: DecisionRecord
     notification_record: Optional[NotificationRecord] = None
+    resolution_result: Optional[ResolutionResult] = None
 
 
 def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> ProcessingResult:
@@ -156,9 +159,38 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
 
         db.flush()
 
+        # 8b. Concurrency-Safe Resolution Lookup & Intelligent Unknown-Alert Resolution
+        resolution_result = resolve_unknown_alert_sync(
+            db=db,
+            fingerprint=fingerprint,
+            alert_type=normalized.alert_name,
+            service=normalized.service,
+            severity=normalized.severity,
+            environment=normalized.labels.get("environment", "production"),
+            message=normalized.message,
+            labels=normalized.labels,
+            occurrence_count=canonical_alert.occurrence_count
+        )
+
+        if incident.resolution_status != "RESOLVED":
+            incident.resolution_status = resolution_result.status
+            db.add(incident)
+            db.flush()
+
         # ----------------------------------------------------
         # Stage 3: Decision Engine, Suppression, Escalation & Notification
         # ----------------------------------------------------
+        # 8c. Compute Deterministic Risk Score
+        env_val = normalized.labels.get("environment") or normalized.labels.get("env") or "production"
+        risk_result = calculate_risk(
+            severity=canonical_alert.priority or canonical_alert.severity,
+            service=incident.service,
+            occurrence_count=incident.alert_count,
+            environment=env_val,
+            first_seen=incident.first_seen,
+            last_seen=incident.last_seen
+        )
+
         decision_outcome = evaluate_alert_decision(
             db=db,
             raw_alert=raw_alert,
@@ -181,14 +213,24 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
             reason=decision_outcome.reason,
             context_snapshot={
                 "service": incident.service,
-                "environment": normalized.labels.get("environment", "production"),
+                "environment": env_val,
                 "priority": canonical_alert.priority,
                 "severity": canonical_alert.severity,
                 "occurrence_count": canonical_alert.occurrence_count,
+                "incident_alert_count": incident.alert_count,
                 "is_duplicate": is_duplicate,
                 "is_storm": is_storm,
                 "incident_number": incident.incident_number,
-                "incident_status": incident.status
+                "incident_status": incident.status,
+                "resolution_status": resolution_result.status,
+                "resolution_source": resolution_result.source,
+                "resolution_confidence": resolution_result.confidence,
+                "ai_called": resolution_result.ai_called,
+                "probable_cause": resolution_result.probable_cause,
+                "resolution_steps": resolution_result.resolution_steps,
+                "risk_score": risk_result.score,
+                "risk_level": risk_result.level,
+                "risk_breakdown": risk_result.to_dict()["breakdown"]
             },
             processing_time_ms=duration_ms,
             created_at=now
@@ -226,15 +268,39 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
                 reason_codes=decision_outcome.reason_codes,
                 reason=decision_outcome.reason
             )
-            # Dispatch Escalation Slack notification
-            notification_record = dispatch_notification(
-                db=db,
-                decision_record=decision_record,
-                incident=incident,
-                canonical_alert=canonical_alert,
-                notification_type="ESCALATION",
-                channel="slack"
+            # Dispatch Escalation Notification: send email and Slack for CRITICAL incidents
+            is_critical = (
+                canonical_alert.priority == "CRITICAL" or
+                incident.priority == "CRITICAL" or
+                risk_result.level == "CRITICAL"
             )
+            if is_critical:
+                email_notif = dispatch_notification(
+                    db=db,
+                    decision_record=decision_record,
+                    incident=incident,
+                    canonical_alert=canonical_alert,
+                    notification_type="ESCALATION",
+                    channel="email"
+                )
+                slack_notif = dispatch_notification(
+                    db=db,
+                    decision_record=decision_record,
+                    incident=incident,
+                    canonical_alert=canonical_alert,
+                    notification_type="ESCALATION",
+                    channel="slack"
+                )
+                notification_record = email_notif or slack_notif
+            else:
+                notification_record = dispatch_notification(
+                    db=db,
+                    decision_record=decision_record,
+                    incident=incident,
+                    canonical_alert=canonical_alert,
+                    notification_type="ESCALATION",
+                    channel="slack"
+                )
 
         elif decision_outcome.decision == "NOTIFY":
             notif_type = "RESOLUTION" if "INCIDENT_RESOLVED" in decision_outcome.reason_codes else "INITIAL"
@@ -272,7 +338,8 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
             reason=decision_outcome.reason,
             escalation_level=incident.escalation_level,
             decision_record=decision_record,
-            notification_record=notification_record
+            notification_record=notification_record,
+            resolution_result=resolution_result
         )
 
     except Exception as exc:

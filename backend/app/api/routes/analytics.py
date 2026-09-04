@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.schemas.analytics import (
     AnalyticsOverviewResponse,
     SeverityDistributionItem,
+    IncidentPriorityDistributionItem,
     SourceDistributionItem,
     ServiceDistributionItem,
     NoisyServiceItem,
@@ -64,6 +65,30 @@ def get_alerts_by_severity(
     except Exception as exc:
         logger.error(f"Error fetching severity distribution: {exc}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch severity distribution")
+
+
+@router.get(
+    "/incidents-by-priority",
+    response_model=List[IncidentPriorityDistributionItem],
+    summary="Get incident volume distribution by priority / risk level",
+    description="Returns counts and percentage breakdown of incidents grouped by priority (CRITICAL, HIGH, MEDIUM, LOW)."
+)
+def get_incidents_by_priority(
+    time_range: Optional[str] = Query(None, description="Time window preset: 15m, 1h, 6h, 24h, 7d, 30d"),
+    start_time: Optional[datetime] = Query(None, description="Explicit start UTC timestamp"),
+    end_time: Optional[datetime] = Query(None, description="Explicit end UTC timestamp"),
+    db: Session = Depends(get_db)
+):
+    try:
+        return analytics_service.get_incidents_by_priority(
+            db=db,
+            time_range=time_range,
+            start_time=start_time,
+            end_time=end_time
+        )
+    except Exception as exc:
+        logger.error(f"Error fetching incident priority distribution: {exc}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch incident priority distribution")
 
 
 @router.get(

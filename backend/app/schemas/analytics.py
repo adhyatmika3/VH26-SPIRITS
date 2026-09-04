@@ -22,6 +22,12 @@ class SeverityDistributionItem(BaseModel):
     percentage: float
 
 
+class IncidentPriorityDistributionItem(BaseModel):
+    priority: str
+    count: int
+    percentage: float
+
+
 class SourceDistributionItem(BaseModel):
     source: str
     count: int

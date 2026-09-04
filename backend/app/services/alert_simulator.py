@@ -83,6 +83,16 @@ def generate_alert_message_variation(service: str, alert_type: str, index: int) 
             f"Request queue saturation on {service}"
         ]
         return variations[idx_mod]
+    elif "PAYMENT" in atype or "GATEWAY" in atype or "ANOMALY" in atype:
+        variations = [
+            f"Unexpected HTTP 502/504 surge from payment gateway processor on {service}",
+            f"{service}: Payment webhook processing failure rate spike > 18.5%",
+            f"TLS handshake latency anomaly detected against upstream payment provider on {service}",
+            f"Idempotency token conflict rate exceeding nominal baseline on {service}",
+            f"{service}: Upstream payment acquirer response signature mismatch",
+            f"Anomalous transaction drop-off rate on {service} checkout pipeline"
+        ]
+        return variations[idx_mod]
     else:
         variations = [
             f"{service}: {alert_type} threshold breached (event #{index + 1})",

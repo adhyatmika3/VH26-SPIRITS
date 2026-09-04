@@ -12,6 +12,7 @@ from app.schemas.incident import (
     IncidentListResponse,
     IncidentAcknowledgeRequest,
     IncidentResolveRequest,
+    IncidentResolutionResponse,
     RunbookResponse,
     RunbookExecuteRequest,
     RunbookExecuteResponse,
@@ -21,6 +22,8 @@ from app.schemas.incident import (
 from app.schemas.notification import NotificationSendRequest, NotificationResponse
 from app.models.decision_record import DecisionRecord
 from app.services.notification_service import dispatch_notification
+from app.services.resolution_service import get_resolution_for_incident
+from app.services.risk_scoring import calculate_and_store_risk
 from app.core.metrics import record_acknowledgement_metric, record_resolution_metric
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
@@ -379,5 +382,67 @@ def execute_incident_runbook(
         all_completed=all_completed,
         message=f"Successfully executed {len(completed_steps)} runbook step(s) for {incident.incident_number}"
     )
+
+
+@router.get(
+    "/{incident_id}/resolution",
+    response_model=IncidentResolutionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get incident diagnostic and resolution intelligence",
+    description="Retrieves automated root-cause analysis and actionable remediation steps."
+)
+def get_incident_resolution(
+    incident_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    incident = db.execute(select(Incident).where(Incident.id == incident_id)).scalars().first()
+    if not incident:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Incident {incident_id} not found")
+
+    res = get_resolution_for_incident(db=db, incident_id=incident_id)
+    if not res:
+        return IncidentResolutionResponse(
+            incident_id=incident.id,
+            status="ANALYSIS_PENDING",
+            probable_cause=None,
+            resolution=[],
+            confidence=None,
+            source=None,
+            ai_called=False
+        )
+
+    return IncidentResolutionResponse(
+        incident_id=incident.id,
+        fingerprint=res.fingerprint,
+        status=res.status,
+        probable_cause=res.probable_cause,
+        resolution=res.resolution_steps,
+        confidence=res.confidence,
+        source=res.source,
+        ai_called=res.ai_called
+    )
+
+
+@router.get(
+    "/{incident_id}/risk",
+    status_code=status.HTTP_200_OK,
+    summary="Get incident risk score and mathematical breakdown",
+    description="Retrieves the deterministic 6-factor risk score (Severity, Frequency, Occurrences, Service, Environment, Duration)."
+)
+def get_incident_risk(
+    incident_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    incident = db.execute(select(Incident).where(Incident.id == incident_id)).scalars().first()
+    if not incident:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Incident {incident_id} not found")
+
+    risk_result = calculate_and_store_risk(incident, db)
+    return {
+        "incident_id": str(incident.id),
+        "incident_number": incident.incident_number,
+        **risk_result.to_dict()
+    }
+
 
 

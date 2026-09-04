@@ -28,6 +28,7 @@ class IncidentResponse(BaseModel):
     unique_alerts_count: int
     is_storm: bool
     escalation_level: int = 0
+    resolution_status: Optional[str] = "PENDING"
     last_notified_at: Optional[datetime] = None
     acknowledged_at: Optional[datetime] = None
     acknowledged_by: Optional[str] = None
@@ -37,6 +38,20 @@ class IncidentResponse(BaseModel):
     last_seen: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class IncidentResolutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    incident_id: uuid.UUID
+    fingerprint: Optional[str] = None
+    status: str  # KNOWN, UNKNOWN, ANALYSIS_PENDING, RESOLVED, FAILED
+    probable_cause: Optional[str] = None
+    resolution: List[str] = []
+    confidence: Optional[float] = None
+    source: Optional[str] = None  # "knowledge_base", "automated_analysis", None
+    ai_called: bool = False
+    created_at: Optional[datetime] = None
 
 
 class IncidentDetailResponse(IncidentResponse):

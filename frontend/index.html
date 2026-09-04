@@ -10,8 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS CDN & Chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script id="tailwind-config">
     tailwind.config = {
       darkMode: "class",
@@ -191,6 +192,12 @@
               </span>
               <span class="material-symbols-outlined text-[14px] text-outline group-hover:text-on-surface">open_in_new</span>
             </a>
+            <a href="http://localhost:8000/api/v1/integrations/slack/health" target="_blank" class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-body-sm text-body-sm transition-colors group">
+              <span class="flex items-center gap-space-sm">
+                <span class="material-symbols-outlined text-[18px] text-purple-600">forum</span>Slack Health
+              </span>
+              <span class="material-symbols-outlined text-[14px] text-outline group-hover:text-on-surface">open_in_new</span>
+            </a>
           </div>
         </div>
       </nav>
@@ -227,9 +234,13 @@
       </div>
 
       <div class="flex items-center gap-space-sm">
-        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span class="font-label-md text-label-md text-on-surface font-medium">Real DB Connected</span>
+        <div id="slack-health-indicator" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low font-code-sm text-xs text-secondary" title="Slack Integration Status">
+          <span id="slack-health-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span id="slack-health-text">Slack: Off</span>
+        </div>
+        <div id="system-health-indicator" class="flex items-center gap-2 px-3 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low font-code-sm text-xs text-secondary" title="Real-time Health Check: FastAPI + PostgreSQL">
+          <span id="system-health-dot" class="w-2 h-2 rounded-full bg-emerald-600"></span>
+          <span id="system-health-text">API: ✓ | DB: ✓</span>
         </div>
         <button onclick="navigateTo('live-alerts')" class="relative w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-container transition-colors text-on-surface-variant" title="Alerts Stream">
           <span class="material-symbols-outlined text-[20px]">notifications</span>
@@ -239,129 +250,201 @@
     </header>
 
     <!-- Main Content Switcher Container -->
-    <main class="relative pt-14 w-full flex-1 bg-background p-space-base">
+    <main class="relative pt-14 w-full flex-1 bg-background px-3 py-2">
       
       <!-- ========================================== -->
       <!-- VIEW 1: OPERATIONS OVERVIEW (DASHBOARD)     -->
       <!-- ========================================== -->
-      <section id="view-dashboard" class="view-section active-view flex flex-col w-full space-y-space-lg">
+      <section id="view-dashboard" class="view-section active-view flex flex-col w-full gap-3">
         
-        <!-- Simplified Clean Header Banner -->
-        <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-xs font-bold uppercase tracking-wider">
-                SRE Intelligence Platform
-              </span>
-              <span class="inline-flex items-center gap-1.5 font-code-sm text-xs text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full font-medium">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Live Database Connected
-              </span>
-            </div>
-            <h1 class="font-headline-lg text-2xl md:text-3xl font-bold text-on-surface tracking-tight">
-              Real-Time Alert Noise Reduction & Incident Correlation
-            </h1>
-            <p class="font-body-sm text-sm text-on-surface-variant max-w-3xl">
-              Eliminating cognitive alert fatigue by collapsing duplicate spikes, correlating cascading microservice failures into root-cause incidents, and delivering high-signal on-call notifications.
-            </p>
+        <!-- Compact Dashboard Page Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h1 class="font-headline-lg text-lg font-bold text-on-surface tracking-tight">Operations Dashboard</h1>
+            <span class="px-2 py-0.5 rounded font-code-sm text-[10px] font-bold uppercase tracking-wider bg-primary-fixed text-on-primary-fixed">Live · PostgreSQL</span>
           </div>
-          
-          <div class="flex items-center gap-3 shrink-0 self-start md:self-center">
-            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-highest text-xs font-code-sm text-secondary">
-              <span class="material-symbols-outlined text-[16px] text-primary">sync</span>
-              <span>Polling: <strong id="countdown-tag" class="text-on-surface">2s</strong></span>
-            </div>
-            <button onclick="fetchAllRealData()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-on-primary font-label-md text-xs font-semibold hover:bg-primary-container transition-colors shadow-sm">
-              <span class="material-symbols-outlined text-[16px]">refresh</span>
-              <span>Refresh</span>
-            </button>
-          </div>
+          <button onclick="fetchAllRealData()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-colors shadow-sm cursor-pointer">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>Refresh</span>
+          </button>
         </div>
 
-        <!-- Operational Summary: 4 Essential Real-Data KPI Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+        <!-- 6 Real Top-Level Operational KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           
-          <!-- KPI 1: Ingested Alerts -->
-          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
-            <div class="flex items-center justify-between">
-              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">1. Ingested Alerts</span>
-              <span class="material-symbols-outlined text-[20px] text-primary">sensors</span>
+          <!-- KPI 1: Incoming Alerts -->
+          <div class="bg-surface-container-lowest p-3.5 rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <span class="font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">Incoming Alerts</span>
+            <div class="my-2">
+              <div class="text-2xl font-bold text-on-surface font-code-sm" id="val-incoming">0</div>
+              <p class="text-[11px] text-on-surface-variant">Raw telemetry events</p>
             </div>
-            <div class="my-3">
-              <div class="text-3xl font-bold text-on-surface font-code-sm tracking-tight" id="val-incoming">0</div>
-              <p class="text-xs text-on-surface-variant mt-1">Raw telemetry received across all services</p>
-            </div>
-            <span class="font-code-sm text-[11px] text-secondary bg-surface-container-low px-2.5 py-1 rounded-lg font-medium self-start">Input Volume</span>
+            <span class="font-code-sm text-[10px] text-secondary bg-surface-container-low px-2 py-0.5 rounded self-start font-medium">Input Volume</span>
           </div>
 
-          <!-- KPI 2: Repeated Alerts Removed -->
-          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
-            <div class="flex items-center justify-between">
-              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">2. Repeated Removed</span>
-              <span class="material-symbols-outlined text-[20px] text-primary">filter_alt</span>
+          <!-- KPI 2: Core Incidents -->
+          <div class="bg-surface-container-lowest p-3.5 rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <span class="font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">Core Incidents</span>
+            <div class="my-2">
+              <div class="text-2xl font-bold text-blue-600 font-code-sm" id="val-core-incidents">0</div>
+              <p class="text-[11px] text-on-surface-variant">Active problem groups</p>
             </div>
-            <div class="my-3">
-              <div class="text-3xl font-bold text-primary font-code-sm tracking-tight" id="val-dedup-count">0</div>
-              <p class="text-xs text-on-surface-variant mt-1">Coalesced in temporal sliding windows</p>
-            </div>
-            <span class="font-code-sm text-[11px] text-primary bg-primary-fixed px-2.5 py-1 rounded-lg font-medium self-start">Deduplication</span>
+            <span class="font-code-sm text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded self-start font-medium">Correlation</span>
           </div>
 
-          <!-- KPI 3: Correlated Groups -->
-          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
-            <div class="flex items-center justify-between">
-              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">3. Correlated Groups</span>
-              <span class="material-symbols-outlined text-[20px] text-blue-600">hub</span>
+          <!-- KPI 3: Alerts Deduplicated -->
+          <div class="bg-surface-container-lowest p-3.5 rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <span class="font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">Deduplicated</span>
+            <div class="my-2">
+              <div class="text-2xl font-bold text-primary font-code-sm" id="val-dedup-count">0</div>
+              <p class="text-[11px] text-on-surface-variant">Repeats coalesced</p>
             </div>
-            <div class="my-3">
-              <div class="text-3xl font-bold text-blue-600 font-code-sm tracking-tight" id="val-grouped-count">0</div>
-              <p class="text-xs text-on-surface-variant mt-1">Cascades bundled into active incidents</p>
-            </div>
-            <span class="font-code-sm text-[11px] text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg font-medium self-start">Topology Correlation</span>
+            <span class="font-code-sm text-[10px] text-primary bg-primary-fixed px-2 py-0.5 rounded self-start font-medium">Sliding Window</span>
           </div>
 
-          <!-- KPI 4: Actionable Dispatches & Noise Reduction -->
-          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between hover:border-outline-variant transition-all">
-            <div class="flex items-center justify-between">
-              <span class="font-label-sm text-xs font-bold text-secondary uppercase tracking-wider">4. Actionable Dispatched</span>
-              <span class="material-symbols-outlined text-[20px] text-emerald-600">send</span>
+          <!-- KPI 4: Notifications Prevented -->
+          <div class="bg-surface-container-lowest p-3.5 rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <span class="font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">Suppressed</span>
+            <div class="my-2">
+              <div class="text-2xl font-bold text-emerald-600 font-code-sm" id="val-suppressed-count">0</div>
+              <p class="text-[11px] text-on-surface-variant">Pager alarms averted</p>
             </div>
-            <div class="my-3">
-              <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-bold text-emerald-600 font-code-sm tracking-tight" id="val-actionable">0</span>
-                <span class="text-xs font-bold text-emerald-700 font-code-sm" id="val-noise-reduction-pct">0% reduced</span>
+            <span class="font-code-sm text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded self-start font-medium">Noise Filtered</span>
+          </div>
+
+          <!-- KPI 5: Critical & High Incidents -->
+          <div class="bg-surface-container-lowest p-3.5 rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <span class="font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">Critical / High</span>
+            <div class="my-2">
+              <div class="text-2xl font-bold text-red-600 font-code-sm" id="val-critical-incidents">0</div>
+              <p class="text-[11px] text-on-surface-variant">Requiring triage</p>
+            </div>
+            <span class="font-code-sm text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded self-start font-medium">High Risk</span>
+          </div>
+
+          <!-- KPI 6: Noise Reduction % -->
+          <div class="bg-surface-container-lowest p-3.5 rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <span class="font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">Noise Reduction</span>
+            <div class="my-2">
+              <div class="text-2xl font-bold text-emerald-600 font-code-sm" id="val-noise-reduction-pct">0.0%</div>
+              <p class="text-[11px] text-on-surface-variant">Cognitive fatigue cut</p>
+            </div>
+            <span class="font-code-sm text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded self-start font-medium">Platform Impact</span>
+          </div>
+
+        </div>
+
+        <!-- REAL OPERATIONAL CHARTS (CHART.JS) -->
+
+        <!-- Chart Row 1: Volume Over Time & Ingestion vs Actionable -->
+        <!-- Operational Graphs Row 1: Volume Over Time & Telemetry Noise Reduction -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-md">
+          
+          <!-- Graph A: Alert Volume Over Time (8 cols) -->
+          <div class="lg:col-span-8 bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-2 border-b border-surface-container-highest">
+              <div>
+                <h3 class="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-[18px] text-primary">show_chart</span>
+                  Alert Ingestion Volume Over Time
+                </h3>
+                <span class="text-[11px] text-secondary font-code-sm">Real-time telemetry intake rate from PostgreSQL</span>
               </div>
-              <p class="text-xs text-on-surface-variant mt-1">High-signal alerts sent to on-call responders</p>
+              <!-- Time Range Selector -->
+              <div class="flex items-center gap-1 font-code-sm text-xs bg-surface-container-low p-1 rounded-lg border border-surface-container-highest self-start sm:self-center">
+                <button type="button" onclick="setChartTimeRange('15m')" class="range-btn active-range px-2 py-0.5 rounded text-[11px] font-bold bg-primary text-on-primary" data-range="15m">15m</button>
+                <button type="button" onclick="setChartTimeRange('1h')" class="range-btn px-2 py-0.5 rounded text-[11px] font-medium text-secondary hover:text-on-surface" data-range="1h">1h</button>
+                <button type="button" onclick="setChartTimeRange('6h')" class="range-btn px-2 py-0.5 rounded text-[11px] font-medium text-secondary hover:text-on-surface" data-range="6h">6h</button>
+                <button type="button" onclick="setChartTimeRange('24h')" class="range-btn px-2 py-0.5 rounded text-[11px] font-medium text-secondary hover:text-on-surface" data-range="24h">24h</button>
+              </div>
             </div>
-            <span class="font-code-sm text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg font-medium self-start">Fatigue Eliminated</span>
+            <div class="relative w-full h-64">
+              <canvas id="chart-alert-volume"></canvas>
+            </div>
+          </div>
+
+          <!-- Graph B: Alert Noise Reduction Funnel (4 cols) -->
+          <div class="lg:col-span-4 bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="pb-3 mb-2 border-b border-surface-container-highest">
+              <h3 class="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[18px] text-emerald-600">filter_list</span>
+                Alert Noise Reduction
+              </h3>
+              <span class="text-[11px] text-secondary font-code-sm">Raw Alerts → Duplicates → Incidents → Notifications</span>
+            </div>
+            <div class="relative w-full h-64">
+              <canvas id="chart-reduction-funnel"></canvas>
+            </div>
           </div>
 
         </div>
 
-        <!-- Telemetry Reduction Flow Strip -->
-        <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row items-center justify-between gap-4">
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="material-symbols-outlined text-[20px] text-primary">analytics</span>
-            <span class="font-label-md text-xs font-bold text-on-surface uppercase tracking-wider">Intelligence Pipeline Flow:</span>
+        <!-- Operational Graphs Row 2: Severity/Risk Distribution & Microservice Telemetry Ranking -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+          
+          <!-- Graph C: Incident Severity / Risk Distribution -->
+          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="pb-3 mb-2 border-b border-surface-container-highest">
+              <h3 class="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[18px] text-red-600">donut_large</span>
+                Incident Risk Distribution
+              </h3>
+              <span class="text-[11px] text-secondary font-code-sm">Active incidents grouped by assessed risk tier (CRITICAL, HIGH, MEDIUM, LOW)</span>
+            </div>
+            <div class="relative w-full h-60 flex items-center justify-center">
+              <canvas id="chart-incident-priority"></canvas>
+            </div>
           </div>
 
-          <div class="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full text-center font-code-sm text-xs">
-            <div class="p-2 rounded-lg bg-surface-container-low border border-surface-container-highest">
-              <span class="text-secondary text-[10px] block">Stage 1: Ingestion</span>
-              <span class="font-bold text-on-surface" id="flow-val-received">0 alerts</span>
+          <!-- Graph D: Alerts by Microservice -->
+          <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="pb-3 mb-2 border-b border-surface-container-highest">
+              <h3 class="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[18px] text-primary">lan</span>
+                Alerts by Microservice
+              </h3>
+              <span class="text-[11px] text-secondary font-code-sm">Top sources generating incoming telemetry in PostgreSQL</span>
             </div>
-            <div class="p-2 rounded-lg bg-surface-container-low border border-surface-container-highest">
-              <span class="text-secondary text-[10px] block">Stage 2: Deduplication</span>
-              <span class="font-bold text-primary" id="flow-val-dedup">0 repeats</span>
+            <div class="relative w-full h-60">
+              <canvas id="chart-alerts-by-service"></canvas>
             </div>
-            <div class="p-2 rounded-lg bg-surface-container-low border border-surface-container-highest">
-              <span class="text-secondary text-[10px] block">Stage 3: Correlation</span>
-              <span class="font-bold text-blue-600" id="flow-val-grouped">0 grouped</span>
+          </div>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SLACK BOT INCIDENT INTEGRATION STATUS (PHASE 8)                 -->
+        <!-- ============================================================== -->
+        <div class="bg-surface-container-lowest p-4 rounded-2xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center text-purple-700 dark:text-purple-300 shrink-0">
+              <span class="material-symbols-outlined text-[22px]">forum</span>
             </div>
-            <div class="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
-              <span class="text-emerald-800 text-[10px] block">Stage 4: Dispatch</span>
-              <span class="font-bold text-emerald-700" id="flow-val-notified">0 notifications</span>
+            <div>
+              <div class="flex items-center gap-2 mb-0.5">
+                <h3 class="font-headline-sm text-sm font-bold text-on-surface">Slack Bot Incident Integration</h3>
+                <span id="slack-status-badge" class="px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Checking...</span>
+              </div>
+              <p class="text-[11px] text-on-surface-variant font-body-sm">Automated Block Kit triage alerts, incident action buttons (Acknowledge / Resolve), and 1-to-1 idempotency.</p>
             </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-4 sm:gap-6 font-code-sm text-xs">
+            <div class="flex items-center gap-1.5">
+              <span id="slack-ind-enabled" class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span class="text-secondary">Enabled: <span id="slack-val-enabled" class="font-semibold text-on-surface">--</span></span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span id="slack-ind-connected" class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span class="text-secondary">Connected: <span id="slack-val-connected" class="font-semibold text-on-surface">--</span></span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span id="slack-ind-channel" class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span class="text-secondary">Channel: <span id="slack-val-channel" class="font-semibold text-on-surface">--</span></span>
+            </div>
+            <a href="http://localhost:8000/api/v1/integrations/slack/health" target="_blank" class="px-2.5 py-1 rounded-lg border border-surface-container-highest text-primary font-medium hover:bg-surface-container transition-colors text-[11px] flex items-center gap-1">
+              <span>Inspect Health</span>
+              <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+            </a>
           </div>
         </div>
 
@@ -398,6 +481,9 @@
               <button type="button" onclick="selectSimPreset('multiple')" class="preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="multiple">
                 300 CPU + 200 DB
               </button>
+              <button type="button" onclick="selectSimPreset('unknown')" class="preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="unknown">
+                New/Unknown Alert
+              </button>
             </div>
           </div>
 
@@ -426,6 +512,7 @@
                 <option value="DATABASE_ERROR">Database Error</option>
                 <option value="MEMORY_HIGH">High Memory</option>
                 <option value="LATENCY_HIGH">High Latency</option>
+                <option value="PaymentGatewayResponseAnomaly">New / Unknown Alert (PaymentGatewayResponseAnomaly)</option>
               </select>
             </div>
 
@@ -552,34 +639,57 @@
                 </div>
               </div>
 
-              <div class="shrink-0">
-                <button type="button" onclick="openRawAlertsModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-semibold border border-surface-container-highest transition-colors shadow-sm">
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="openRawAlertsModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-semibold border border-surface-container-highest transition-colors shadow-sm">
                   <span class="material-symbols-outlined text-[16px] text-primary">visibility</span>
                   <span>View Raw Alerts</span>
+                </button>
+                <button type="button" id="btn-open-incident-details" onclick="openSimulatedIncident()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-colors shadow-sm">
+                  <span class="material-symbols-outlined text-[16px]">psychology</span>
+                  <span>Investigate Incident</span>
                 </button>
               </div>
             </div>
 
-            <!-- Visual Flow Transformation Diagram -->
-            <div class="p-space-base rounded-xl bg-surface-container-low border border-surface-container-highest flex flex-col md:flex-row items-center justify-between gap-2 text-center text-xs font-code-sm">
-              <div class="p-2 rounded-lg bg-surface-container-lowest border border-surface-container-highest w-full md:w-auto flex-1">
-                <span class="font-bold text-on-surface block" id="diag-raw">500 RAW ALERTS</span>
-                <span class="text-[10px] text-secondary">Webhook Ingestion</span>
+            <!-- AI Diagnostic & Remediation Intelligence Card (Live from AI Engine) -->
+            <div id="sim-ai-resolution-card" class="p-space-lg rounded-2xl bg-surface-container-lowest border-2 border-primary/40 shadow-sm flex flex-col gap-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-surface-container-highest pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary text-[22px]">psychology</span>
+                  <div>
+                    <h4 class="font-headline-sm text-sm font-bold text-on-surface">Diagnostic & Remediation Intelligence (AI Engine)</h4>
+                    <span class="text-[11px] text-secondary">Automated root cause deduction & step-by-step SRE runbook synthesis</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 self-start sm:self-center">
+                  <span id="sim-ai-source-badge" class="px-2.5 py-1 rounded font-code-sm text-[11px] font-bold bg-primary-fixed text-on-primary-fixed">Automated Analysis (Gemini)</span>
+                  <span id="sim-ai-confidence-badge" class="px-2.5 py-1 rounded-full font-code-sm text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">94% Confidence</span>
+                </div>
               </div>
-              <span class="material-symbols-outlined text-primary text-[20px] shrink-0 rotate-90 md:rotate-0">arrow_forward</span>
-              <div class="p-2 rounded-lg bg-surface-container-lowest border border-surface-container-highest w-full md:w-auto flex-1">
-                <span class="font-bold text-primary block">POSTGRESQL AUDIT</span>
-                <span class="text-[10px] text-secondary">500 Records Retained</span>
+
+              <!-- Probable Root Cause -->
+              <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest space-y-1.5">
+                <div class="flex items-center gap-1.5 font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">
+                  <span class="material-symbols-outlined text-[16px] text-primary">search_insights</span>
+                  Probable Root Cause
+                </div>
+                <div id="sim-ai-root-cause" class="text-xs font-medium text-on-surface leading-relaxed">
+                  Analyzing alert telemetry...
+                </div>
               </div>
-              <span class="material-symbols-outlined text-primary text-[20px] shrink-0 rotate-90 md:rotate-0">arrow_forward</span>
-              <div class="p-2 rounded-lg bg-surface-container-lowest border border-surface-container-highest w-full md:w-auto flex-1">
-                <span class="font-bold text-blue-600 block">GROUP / NORMALIZE</span>
-                <span class="text-[10px] text-secondary">Deterministic Fingerprint</span>
-              </div>
-              <span class="material-symbols-outlined text-primary text-[20px] shrink-0 rotate-90 md:rotate-0">arrow_forward</span>
-              <div class="p-2 rounded-lg bg-emerald-50 border border-emerald-300 w-full md:w-auto flex-1">
-                <span class="font-bold text-emerald-700 block" id="diag-inc">1 CORE INCIDENT</span>
-                <span class="text-[10px] text-emerald-600" id="diag-reduction">99.8% Noise Reduction</span>
+
+              <!-- Recommended Remediation Steps -->
+              <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-1.5 font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">
+                    <span class="material-symbols-outlined text-[16px] text-emerald-600">playlist_add_check</span>
+                    Recommended Remediation Steps
+                  </div>
+                  <span id="sim-ai-steps-count" class="font-code-sm text-[10px] text-secondary">5 ACTION STEPS</span>
+                </div>
+                <ul id="sim-ai-steps-list" class="space-y-2">
+                  <!-- Dynamically populated -->
+                </ul>
               </div>
             </div>
 
@@ -630,18 +740,15 @@
       <!-- ========================================== -->
       <!-- VIEW 2: LIVE ALERTS STREAM                 -->
       <!-- ========================================== -->
-      <section id="view-live-alerts" class="view-section hidden flex flex-col w-full space-y-space-md">
-        <!-- Live Alerts Table Header -->
-        <div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-md">
-          <div class="flex flex-col gap-0.5">
-            <div class="flex items-center gap-space-sm">
-              <h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">Alert Explorer</h2>
-              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-label-sm text-label-sm font-semibold">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>PostgreSQL Stream</span>
-              </div>
+      <section id="view-live-alerts" class="view-section hidden flex flex-col w-full gap-3">
+        <!-- Alert Explorer Compact Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h2 class="font-headline-lg text-lg font-bold text-on-surface tracking-tight">Alert Explorer</h2>
+            <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-label-sm text-[10px] font-semibold">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Live Stream</span>
             </div>
-            <p class="font-body-sm text-body-sm text-on-surface-variant">Real canonical alerts ingested by the intelligence pipeline</p>
           </div>
         </div>
 
@@ -669,28 +776,15 @@
       <!-- ========================================== -->
       <!-- VIEW 3: ALERT GROUPS & DEDUPLICATION       -->
       <!-- ========================================== -->
-      <section id="view-alert-groups" class="view-section hidden flex flex-col w-full gap-space-lg">
-        <div class="relative w-full rounded-xl bg-surface-container-lowest p-space-base shadow-sm overflow-hidden">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm pb-space-xs">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-code-sm text-code-sm font-semibold tracking-wide uppercase">Algorithmic Triage Engine</span>
-                <span class="flex items-center gap-1 font-code-sm text-code-sm text-outline">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Live Pipeline Active
-                </span>
-              </div>
-              <h2 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">Alert Groups & Deduplication</h2>
-              <p class="font-body-sm text-body-sm text-on-surface-variant max-w-2xl">
-                Dynamic fingerprint grouping and noise suppression clusters within sliding temporal windows. Mitigating cognitive fatigue before human escalation.
-              </p>
-            </div>
-            <div class="flex items-center gap-space-sm self-start md:self-auto">
-              <button onclick="recalculateHashes()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md transition-colors shadow-sm">
-                <span class="material-symbols-outlined text-[16px]">auto_fix_high</span>
-                <span>Recalculate Hashes</span>
-              </button>
-            </div>
+      <section id="view-alert-groups" class="view-section hidden flex flex-col w-full gap-3">
+        <!-- Correlated Groups Compact Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h2 class="font-headline-lg text-lg text-on-surface font-bold tracking-tight">Correlated Incident Groups</h2>
+            <span class="flex items-center gap-1 px-2 py-0.5 rounded font-code-sm text-[10px] font-bold text-primary bg-primary-fixed">
+              <span class="material-symbols-outlined text-[13px]">fingerprint</span>
+              Fingerprinted
+            </span>
           </div>
         </div>
 
@@ -703,9 +797,9 @@
       <!-- ========================================== -->
       <!-- VIEW 4: INCIDENT DETAILS & RUNBOOKS        -->
       <!-- ========================================== -->
-      <section id="view-incident-details" class="view-section hidden flex flex-col w-full gap-space-lg">
+      <section id="view-incident-details" class="view-section hidden flex flex-col w-full gap-3">
         <!-- Incident Control Banner -->
-        <div class="relative bg-surface-container-lowest rounded-xl p-space-base shadow-sm overflow-hidden flex flex-col gap-space-md">
+        <div class="relative bg-surface-container-lowest rounded-xl p-3 shadow-sm overflow-hidden flex flex-col gap-3">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md relative z-10">
             <div class="flex flex-col gap-space-2xs">
               <div class="flex flex-wrap items-center gap-space-sm">
@@ -750,30 +844,6 @@
             </div>
           </div>
 
-          <!-- Acknowledge & Resolve Operator Quick-Action Card -->
-          <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-[18px]">bolt</span>
-              </div>
-              <div class="text-xs">
-                <span class="font-bold text-on-surface">One-Click SRE Triage:</span>
-                <span class="text-on-surface-variant ml-1">Click <strong>Acknowledge</strong> to signal responder investigation & record MTTA. Click <strong>Resolve</strong> once system health is restored.</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button onclick="handleAcknowledgeCurrentIncident()" class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-code-sm text-xs font-bold flex items-center gap-1 transition-colors shadow-xs cursor-pointer">
-                <span class="material-symbols-outlined text-[14px]">task_alt</span>
-                <span>Acknowledge</span>
-              </button>
-              <button onclick="handleResolveCurrentIncident()" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-code-sm text-xs font-bold flex items-center gap-1 transition-colors shadow-xs cursor-pointer">
-                <span class="material-symbols-outlined text-[14px]">check_circle</span>
-                <span>Resolve</span>
-              </button>
-            </div>
-          </div>
-
-
           <!-- Metadata Ribbon -->
           <div class="flex flex-wrap items-center gap-x-space-lg gap-y-space-xs pt-space-xs text-on-surface-variant font-label-sm text-label-sm bg-surface-container-low/70 px-space-base py-space-xs rounded-lg">
             <div class="flex items-center gap-1.5">
@@ -795,6 +865,118 @@
               <span class="material-symbols-outlined text-[16px] text-secondary">account_circle</span>
               <span class="text-secondary">Responder:</span>
               <span id="incident-owner" class="font-medium text-on-surface">Automated SRE Engine</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Incident Risk Scoring & Priority Evaluation Model (6-Factor Mathematical Formula) -->
+        <div id="incident-risk-card" class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col gap-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-surface-container-highest pb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[18px]">assessment</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="font-headline-sm text-base font-bold text-on-surface">Incident Risk Score & Decision Model</h3>
+                  <span class="px-2 py-0.5 rounded font-code-sm text-[11px] bg-surface-container text-secondary font-semibold">Deterministic Algorithm</span>
+                </div>
+                <p class="text-xs text-on-surface-variant">Real 6-parameter formula evaluating urgency, blast radius, and business impact</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="px-3 py-1 rounded-xl font-code-sm text-xs font-bold bg-surface-container border border-surface-container-highest text-on-surface">
+                Risk Score: <strong id="risk-score-display" class="text-red-600 text-sm">--</strong><span class="text-secondary"> / 100</span>
+              </div>
+              <span id="risk-level-display" class="px-2.5 py-1 rounded-xl font-code-sm text-xs font-bold bg-red-600 text-white uppercase">CRITICAL</span>
+            </div>
+          </div>
+
+          <!-- Mathematical Formula Breakdown Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse font-body-sm text-xs">
+              <thead>
+                <tr class="bg-surface-container-low text-secondary font-label-sm text-[10px] uppercase tracking-wider border-b border-surface-container-highest">
+                  <th class="py-2.5 px-3">Evaluation Dimension</th>
+                  <th class="py-2.5 px-3">Weight Parameter</th>
+                  <th class="py-2.5 px-3">Evaluation Rule</th>
+                  <th class="py-2.5 px-3 text-right font-code-sm">Contribution</th>
+                </tr>
+              </thead>
+              <tbody id="risk-breakdown-tbody" class="divide-y divide-surface-container-highest font-code-sm">
+                <tr>
+                  <td class="py-2.5 px-3 font-medium text-on-surface">Severity Weight</td>
+                  <td class="py-2.5 px-3 text-secondary">0 – 30 pts</td>
+                  <td class="py-2.5 px-3 text-on-surface-variant font-sans">Critical=30, Error=20, Warning=10, Info=0</td>
+                  <td id="rb-severity" class="py-2.5 px-3 text-right font-bold text-on-surface">+30</td>
+                </tr>
+                <tr>
+                  <td class="py-2.5 px-3 font-medium text-on-surface">Alert Frequency</td>
+                  <td class="py-2.5 px-3 text-secondary">0 – 20 pts</td>
+                  <td class="py-2.5 px-3 text-on-surface-variant font-sans">>10 alerts/min = 20, >5 = 15, >1 = 10</td>
+                  <td id="rb-frequency" class="py-2.5 px-3 text-right font-bold text-on-surface">+20</td>
+                </tr>
+                <tr>
+                  <td class="py-2.5 px-3 font-medium text-on-surface">Total Occurrences</td>
+                  <td class="py-2.5 px-3 text-secondary">0 – 15 pts</td>
+                  <td class="py-2.5 px-3 text-on-surface-variant font-sans">>50 = 15, >20 = 10, >5 = 5</td>
+                  <td id="rb-occurrences" class="py-2.5 px-3 text-right font-bold text-on-surface">+15</td>
+                </tr>
+                <tr>
+                  <td class="py-2.5 px-3 font-medium text-on-surface">Service Tier Criticality</td>
+                  <td class="py-2.5 px-3 text-secondary">0 – 20 pts</td>
+                  <td class="py-2.5 px-3 text-on-surface-variant font-sans">Tier-1 core business path = 20, Tier-2 = 10, Other = 5</td>
+                  <td id="rb-service" class="py-2.5 px-3 text-right font-bold text-on-surface">+20</td>
+                </tr>
+                <tr>
+                  <td class="py-2.5 px-3 font-medium text-on-surface">Environment Scope</td>
+                  <td class="py-2.5 px-3 text-secondary">0 – 10 pts</td>
+                  <td class="py-2.5 px-3 text-on-surface-variant font-sans">Production=10, Staging=5, Development=2</td>
+                  <td id="rb-environment" class="py-2.5 px-3 text-right font-bold text-on-surface">+10</td>
+                </tr>
+                <tr>
+                  <td class="py-2.5 px-3 font-medium text-on-surface">Incident Active Duration</td>
+                  <td class="py-2.5 px-3 text-secondary">0 – 5 pts</td>
+                  <td class="py-2.5 px-3 text-on-surface-variant font-sans">>60m = 5, >30m = 3, >10m = 2</td>
+                  <td id="rb-duration" class="py-2.5 px-3 text-right font-bold text-on-surface">+3</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="bg-surface-container font-bold text-on-surface border-t border-surface-container-highest">
+                  <td colspan="3" class="py-2.5 px-3 uppercase text-xs">Total Composite Risk Score</td>
+                  <td id="rb-total" class="py-2.5 px-3 text-right text-red-600 font-bold text-sm font-code-sm">98 / 100</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Incident Diagnostic & Remediation Intelligence Card (Cloud AI & Knowledge Base) -->
+        <div id="incident-resolution-card" class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-surface-container-highest flex flex-col gap-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container-highest">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[18px]">verified_user</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="font-headline-sm text-base font-bold text-on-surface">Diagnostic & Remediation Intelligence</h3>
+                  <span id="resolution-source-badge" class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] font-semibold text-secondary">Checking knowledge...</span>
+                </div>
+                <p class="text-xs text-on-surface-variant">Automated root-cause analysis and actionable SRE remediation steps</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2" id="resolution-meta-badges">
+              <span id="resolution-confidence-badge" class="hidden px-2.5 py-0.5 rounded-full font-code-sm text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                92% Confidence
+              </span>
+            </div>
+          </div>
+
+          <!-- Dynamic Resolution Content -->
+          <div id="incident-resolution-content" class="space-y-3">
+            <div class="p-4 text-center text-secondary border border-dashed border-surface-container-highest rounded-xl text-xs">
+              Loading diagnostic analysis...
             </div>
           </div>
         </div>
@@ -860,79 +1042,123 @@
       <!-- ========================================== -->
       <!-- VIEW 5: ANALYTICS & IMPACT (STEP 10)        -->
       <!-- ========================================== -->
-      <section id="view-analytics" class="view-section hidden flex flex-col w-full space-y-space-lg">
-        <!-- Analytics Header Banner -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-xs font-bold uppercase">Impact Analytics</span>
-              <span class="font-code-sm text-xs text-secondary">POSTGRESQL DERIVED METRICS</span>
-            </div>
-            <h2 class="font-headline-lg text-2xl font-bold text-on-surface tracking-tight">Fatigue Reduction & Operational Efficiency</h2>
-            <p class="text-sm text-on-surface-variant max-w-3xl">
-              Auditing telemetry noise suppression, responder acknowledgment velocity, and cognitive fatigue mitigation across services.
-            </p>
-          </div>
+      <section id="view-analytics" class="view-section hidden flex flex-col w-full gap-3">
+        <!-- Analytics Compact Header -->
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <button onclick="fetchLiveAnalytics()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-sm transition-colors shadow-sm">
-              <span class="material-symbols-outlined text-[18px]">refresh</span>
-              <span>Refresh Metrics</span>
-            </button>
+            <h2 class="font-headline-lg text-lg font-bold text-on-surface tracking-tight">Analytics &amp; Impact</h2>
+            <span class="px-2 py-0.5 rounded font-code-sm text-[10px] font-bold uppercase tracking-wider bg-primary-fixed text-on-primary-fixed">PostgreSQL Metrics</span>
           </div>
+          <button onclick="fetchLiveAnalytics()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-xs font-semibold border border-surface-container-highest transition-colors">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>Refresh</span>
+          </button>
         </div>
 
-        <!-- Metric Rates Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
-          <!-- Rate 1: Noise Reduction Rate -->
+        <!-- 8 Real Operational Impact Metrics Grid (Derived directly from PostgreSQL) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-space-md">
+          <!-- Metric 1: Total Ingested Alerts -->
           <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-secondary uppercase">Noise Reduction Rate</span>
-              <span class="material-symbols-outlined text-[20px] text-emerald-600">tune</span>
+              <span class="text-xs font-bold text-secondary uppercase">Total Ingested</span>
+              <span class="material-symbols-outlined text-[20px] text-primary">sensors</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-emerald-600 font-code-sm" id="analytics-noise-reduction">0.0%</span>
-              <p class="text-xs text-on-surface-variant mt-1">Percentage of alerts that did not need to interrupt a responder</p>
+              <span class="text-2xl font-bold text-on-surface font-code-sm" id="analytics-total-alerts">0</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Raw telemetry events</p>
             </div>
-            <span class="text-[11px] font-code-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">Primary Fatigue Metric</span>
+            <span class="text-[10px] font-code-sm text-secondary bg-surface-container px-2 py-0.5 rounded self-start font-medium">Input Stream</span>
           </div>
 
-          <!-- Rate 2: Deduplication Rate -->
+          <!-- Metric 2: Alerts Deduplicated -->
           <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-secondary uppercase">Repeated Alert Rate</span>
+              <span class="text-xs font-bold text-secondary uppercase">Deduplicated</span>
               <span class="material-symbols-outlined text-[20px] text-primary">filter_alt</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-primary font-code-sm" id="analytics-dedup-rate">0.0%</span>
-              <p class="text-xs text-on-surface-variant mt-1">Spikes and repeated notifications coalesced into single streams</p>
+              <span class="text-2xl font-bold text-primary font-code-sm" id="analytics-dedup-count">0</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Repeated bursts coalesced</p>
             </div>
-            <span class="text-[11px] font-code-sm text-primary bg-primary-fixed px-2 py-0.5 rounded font-medium">Sliding Cooldown</span>
+            <span class="text-[10px] font-code-sm text-primary bg-primary-fixed px-2 py-0.5 rounded self-start font-medium">Temporal Cooldown</span>
           </div>
 
-          <!-- Rate 3: Notification Rate -->
+          <!-- Metric 3: Core Incidents Created -->
           <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-secondary uppercase">Notification Rate</span>
-              <span class="material-symbols-outlined text-[20px] text-violet-600">send</span>
+              <span class="text-xs font-bold text-secondary uppercase">Core Incidents</span>
+              <span class="material-symbols-outlined text-[20px] text-blue-600">hub</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-violet-600 font-code-sm" id="analytics-notification-rate">0.0%</span>
-              <p class="text-xs text-on-surface-variant mt-1">Actionable alerts approved for human SRE on-call dispatch</p>
+              <span class="text-2xl font-bold text-blue-600 font-code-sm" id="analytics-core-incidents">0</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Root cause clusters</p>
             </div>
-            <span class="text-[11px] font-code-sm text-violet-700 bg-violet-50 px-2 py-0.5 rounded font-medium">High Signal Ratio</span>
+            <span class="text-[10px] font-code-sm text-blue-700 bg-blue-50 px-2 py-0.5 rounded self-start font-medium">Consolidated</span>
           </div>
 
-          <!-- Rate 4: Average Time to Acknowledge (MTTA) -->
+          <!-- Metric 4: Notifications Prevented -->
           <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-secondary uppercase">Time to Acknowledge (MTTA)</span>
+              <span class="text-xs font-bold text-secondary uppercase">Suppressed Alarms</span>
+              <span class="material-symbols-outlined text-[20px] text-emerald-600">block</span>
+            </div>
+            <div class="my-2">
+              <span class="text-2xl font-bold text-emerald-600 font-code-sm" id="analytics-suppressed-count">0</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Pager interruptions spared</p>
+            </div>
+            <span class="text-[10px] font-code-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded self-start font-medium">Noise Eliminated</span>
+          </div>
+
+          <!-- Metric 5: Actionable Notification Rate -->
+          <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-secondary uppercase">Actionable Signal</span>
+              <span class="material-symbols-outlined text-[20px] text-violet-600">notifications_active</span>
+            </div>
+            <div class="my-2">
+              <span class="text-2xl font-bold text-violet-600 font-code-sm" id="analytics-notification-rate">0.0%</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Dispatches to responders</p>
+            </div>
+            <span class="text-[10px] font-code-sm text-violet-700 bg-violet-50 px-2 py-0.5 rounded self-start font-medium">Signal Ratio</span>
+          </div>
+
+          <!-- Metric 6: Average Time to Acknowledge (MTTA) -->
+          <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-secondary uppercase">Avg MTTA</span>
               <span class="material-symbols-outlined text-[20px] text-amber-600">timer</span>
             </div>
             <div class="my-2">
-              <span class="text-3xl font-bold text-amber-600 font-code-sm" id="analytics-mtta">Awaiting data</span>
-              <p class="text-xs text-on-surface-variant mt-1">Average duration from trigger to operator acknowledgment</p>
+              <span class="text-2xl font-bold text-amber-600 font-code-sm" id="analytics-mtta">Awaiting data</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Time to operator acknowledgment</p>
             </div>
-            <span class="text-[11px] font-code-sm text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium">Incident Response Speed</span>
+            <span class="text-[10px] font-code-sm text-amber-700 bg-amber-50 px-2 py-0.5 rounded self-start font-medium">Triage Speed</span>
+          </div>
+
+          <!-- Metric 7: Average Time to Resolve (MTTR) -->
+          <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-secondary uppercase">Avg MTTR</span>
+              <span class="material-symbols-outlined text-[20px] text-emerald-600">check_circle</span>
+            </div>
+            <div class="my-2">
+              <span class="text-2xl font-bold text-emerald-600 font-code-sm" id="analytics-mttr">Awaiting data</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Time to full remediation</p>
+            </div>
+            <span class="text-[10px] font-code-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded self-start font-medium">Recovery Speed</span>
+          </div>
+
+          <!-- Metric 8: Noise Reduction Rate % -->
+          <div class="bg-surface-container-lowest p-space-base rounded-xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-secondary uppercase">Reduction Rate</span>
+              <span class="material-symbols-outlined text-[20px] text-emerald-600">tune</span>
+            </div>
+            <div class="my-2">
+              <span class="text-2xl font-bold text-emerald-600 font-code-sm" id="analytics-noise-reduction">0.0%</span>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Total noise prevented</p>
+            </div>
+            <span class="text-[10px] font-code-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded self-start font-medium">Fatigue Saved</span>
           </div>
         </div>
 
@@ -964,106 +1190,40 @@
             </table>
           </div>
         </div>
-
-        <!-- Plain-English Judge Glossary Card (Step 13: Non-Technical Judge Comprehension) -->
-        <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest">
-          <div class="pb-3 mb-3 border-b border-surface-container-highest">
-            <h3 class="font-headline-sm text-lg font-bold text-on-surface flex items-center gap-2">
-              <span class="material-symbols-outlined text-[20px] text-primary">menu_book</span>
-              Non-Technical Judge Quick Reference Guide
-            </h3>
-            <p class="text-xs text-on-surface-variant">Simple explanations for key SRE intelligence concepts</p>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-body-sm">
-            <div class="p-3 rounded-xl bg-surface-container-low space-y-1">
-              <div class="font-bold text-on-surface text-sm">Remove Repeated Alerts <span class="text-primary font-code-sm font-normal text-xs">(Deduplication)</span></div>
-              <p class="text-on-surface-variant">When monitoring tools send 10 alerts in 10 seconds for the same issue, the system merges them into 1 single event so on-call engineers don't get spammed.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-surface-container-low space-y-1">
-              <div class="font-bold text-on-surface text-sm">Group Related Alerts <span class="text-blue-600 font-code-sm font-normal text-xs">(Correlation)</span></div>
-              <p class="text-on-surface-variant">When a database fails and causes 5 downstream web APIs to trigger alerts, the system bundles all 5 alerts under 1 primary incident instead of creating 5 separate alarms.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-surface-container-low space-y-1">
-              <div class="font-bold text-on-surface text-sm">Prevent Unnecessary Notifications <span class="text-emerald-600 font-code-sm font-normal text-xs">(Suppression)</span></div>
-              <p class="text-on-surface-variant">Low-impact test warnings, non-production metric jitters, and rapid repetitive flashes are silenced automatically while logging an audit trail.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-surface-container-low space-y-1">
-              <div class="font-bold text-on-surface text-sm">Average Time to Acknowledge <span class="text-amber-600 font-code-sm font-normal text-xs">(MTTA)</span></div>
-              <p class="text-on-surface-variant">How long it takes an engineer to click 'Acknowledge' after receiving an alert. Reducing noise directly speeds this up from 45 minutes to under 3 minutes.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-surface-container-low space-y-1">
-              <div class="font-bold text-on-surface text-sm">Average Time to Resolve <span class="text-emerald-600 font-code-sm font-normal text-xs">(MTTR)</span></div>
-              <p class="text-on-surface-variant">The total duration from incident detection until complete mitigation. Having root-cause context immediately available saves critical minutes.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-surface-container-low space-y-1">
-              <div class="font-bold text-on-surface text-sm">Actionable Signal Ratio</div>
-              <p class="text-on-surface-variant">The percentage of delivered messages that genuinely required engineer intervention. Alert Fatigue Buster drives this from 3% to over 95%.</p>
-            </div>
-          </div>
-        </div>
       </section>
 
       <!-- ========================================== -->
       <!-- VIEW 6: DECISION INTELLIGENCE (PHASE 7)    -->
       <!-- ========================================== -->
-      <section id="view-decision-intelligence" class="view-section hidden flex flex-col w-full space-y-space-lg">
-
-        <!-- Header Banner -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-code-sm text-xs font-bold uppercase">Decision Intelligence</span>
-              <span class="font-code-sm text-xs text-secondary">PHASE 7 · EXPLAINABILITY</span>
-            </div>
-            <h2 class="font-headline-lg text-2xl font-bold text-on-surface tracking-tight">How Our System Makes Decisions</h2>
-            <p class="text-sm text-on-surface-variant max-w-3xl">
-              Every automated decision explained. Understand what the system decided, why it decided it, and what evidence supported the decision.
-            </p>
-          </div>
+      <section id="view-decision-intelligence" class="view-section hidden flex flex-col w-full gap-3">
+        <!-- Decision Intelligence Compact Header -->
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <button onclick="fetchDecisionIntelligence()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-sm transition-colors shadow-sm">
-              <span class="material-symbols-outlined text-[18px]">refresh</span>
-              <span>Refresh</span>
-            </button>
+            <h2 class="font-headline-lg text-lg font-bold text-on-surface tracking-tight">Decision Intelligence</h2>
+            <span class="px-2 py-0.5 rounded font-code-sm text-[10px] font-bold uppercase tracking-wider bg-primary-fixed text-on-primary-fixed">Explainability &amp; Audit</span>
           </div>
+          <button onclick="fetchDecisionIntelligence()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-xs font-semibold border border-surface-container-highest transition-colors">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>Refresh</span>
+          </button>
         </div>
 
-        <!-- Decision Flow Diagram -->
-        <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest">
-          <h3 class="font-headline-sm text-lg font-bold text-on-surface mb-4 flex items-center gap-2">
-            <span class="material-symbols-outlined text-[20px] text-primary">account_tree</span>
-            Decision Pipeline
-          </h3>
-          <div class="flex flex-wrap items-center justify-center gap-2 text-sm font-medium">
-            <div class="px-4 py-2.5 rounded-xl bg-primary-fixed text-on-primary-fixed border border-surface-container-highest flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]">input</span>
-              Alert Received
+        <!-- Real Decision Analytics Time-Series Graph -->
+        <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col gap-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-surface-container-highest pb-3">
+            <div>
+              <h3 class="font-headline-sm text-base font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-[20px] text-primary">timeline</span>
+                Decisions Over Time
+              </h3>
+              <p class="text-xs text-on-surface-variant">Real-time breakdown of noise suppression vs actionable escalation dispatches</p>
             </div>
-            <span class="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>
-            <div class="px-4 py-2.5 rounded-xl bg-surface-container border border-surface-container-highest flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]">filter_alt</span>
-              Check Repetition
+            <div class="flex items-center gap-2">
+              <span class="font-code-sm text-xs text-secondary">DecisionRecord Analytics</span>
             </div>
-            <span class="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>
-            <div class="px-4 py-2.5 rounded-xl bg-surface-container border border-surface-container-highest flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]">hub</span>
-              Check Related Problems
-            </div>
-            <span class="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>
-            <div class="px-4 py-2.5 rounded-xl bg-surface-container border border-surface-container-highest flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]">priority_high</span>
-              Determine Importance
-            </div>
-            <span class="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>
-            <div class="px-4 py-2.5 rounded-xl bg-primary text-on-primary border border-primary-container flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]">psychology</span>
-              Decision
-            </div>
-            <span class="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>
-            <div class="px-4 py-2.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]">check_circle</span>
-              Outcome
-            </div>
+          </div>
+          <div class="relative w-full h-64">
+            <canvas id="chart-decision-timeline"></canvas>
           </div>
         </div>
 
@@ -1179,85 +1339,7 @@
   </div>
 
 
-  <!-- ========================================== -->
-  <!-- MODAL 1: NEW INCIDENT CREATION DIALOG      -->
-  <!-- ========================================== -->
-  <div id="new-incident-modal" class="modal-overlay">
-    <div class="bg-surface-container-lowest border border-surface-container-highest rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-surface-container-highest pb-3">
-        <h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Declare SRE Incident</h3>
-        <button onclick="closeNewIncidentModal()" class="text-outline hover:text-on-surface">
-          <span class="material-symbols-outlined text-[20px]">close</span>
-        </button>
-      </div>
-      <form id="new-incident-form" class="space-y-4 font-body-md text-body-md">
-        <div>
-          <label class="block font-label-md text-label-md text-secondary mb-1">Incident Title</label>
-          <input id="incident-title" type="text" required placeholder="e.g. High latency on checkout payment gateway" class="w-full bg-surface-container-low border border-surface-container-highest rounded-xl px-4 py-2.5 text-on-surface focus:outline-none focus:border-primary transition-colors" />
-        </div>
-        <div>
-          <label class="block font-label-md text-label-md text-secondary mb-1">Target Service</label>
-          <select id="incident-service" required class="w-full bg-surface-container-low border border-surface-container-highest rounded-xl px-4 py-2.5 text-on-surface focus:outline-none focus:border-primary transition-colors">
-            <option value="payment-service">payment-service</option>
-            <option value="auth-service">auth-service</option>
-            <option value="order-service">order-service</option>
-            <option value="database">database</option>
-            <option value="api-gateway">api-gateway</option>
-            <option value="cart-service">cart-service</option>
-          </select>
-        </div>
-        <div>
-          <label class="block font-label-md text-label-md text-secondary mb-1">Initial Priority</label>
-          <select id="incident-priority" required class="w-full bg-surface-container-low border border-surface-container-highest rounded-xl px-4 py-2.5 text-on-surface focus:outline-none focus:border-primary transition-colors">
-            <option value="HIGH">HIGH (Urgent)</option>
-            <option value="CRITICAL">CRITICAL (Outage)</option>
-            <option value="MEDIUM">MEDIUM (Standard)</option>
-            <option value="LOW">LOW (Informational)</option>
-          </select>
-        </div>
-        <div class="pt-2 flex items-center justify-end gap-3">
-          <button type="button" onclick="closeNewIncidentModal()" class="px-4 py-2 rounded-xl border border-surface-container-highest text-secondary hover:bg-surface-container transition-colors">
-            Cancel
-          </button>
-          <button type="submit" class="px-5 py-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary/90 transition-colors shadow-sm">
-            Create Incident
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
 
-  <!-- ========================================== -->
-  <!-- MODAL 2: INCIDENT TIMELINE MODAL           -->
-  <!-- ========================================== -->
-  <div id="timeline-modal" class="modal-overlay">
-    <div class="bg-surface-container-lowest border border-surface-container-highest rounded-2xl w-full max-w-2xl max-h-[85vh] p-6 shadow-2xl flex flex-col">
-      <div class="flex items-center justify-between border-b border-surface-container-highest pb-4 shrink-0">
-        <div>
-          <div class="flex items-center gap-2 mb-1">
-            <span id="timeline-incident-number" class="font-code-sm text-xs font-bold px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed">INC-XXXX</span>
-            <span id="timeline-incident-priority" class="font-code-sm text-xs font-bold px-2 py-0.5 rounded">HIGH</span>
-            <span id="timeline-incident-status" class="font-code-sm text-xs font-bold px-2 py-0.5 rounded">OPEN</span>
-          </div>
-          <h3 id="timeline-modal-title" class="font-headline-sm text-lg font-bold text-on-surface">Incident Event Timeline</h3>
-          <p id="timeline-modal-subtitle" class="text-xs text-secondary mt-0.5">Service · First Seen · Alert Count</p>
-        </div>
-        <button onclick="closeTimelineModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container transition-colors">
-          <span class="material-symbols-outlined text-[22px]">close</span>
-        </button>
-      </div>
-      <div class="flex-1 overflow-y-auto py-4 pr-1">
-        <div id="timeline-events-container" class="space-y-4">
-          <!-- Dynamically populated -->
-        </div>
-      </div>
-      <div class="border-t border-surface-container-highest pt-3 flex justify-between items-center shrink-0">
-        <span class="font-code-sm text-xs text-secondary">Ordered chronologically (First Seen → Current)</span>
-        <button onclick="closeTimelineModal()" class="px-4 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-sm font-label-md transition-colors">
-          Close
-        </button>
-      </div>
-  </div>
 
   <!-- ========================================== -->
   <!-- MODAL 3: RAW ALERTS AUDIT MODAL (POSTGRES) -->

@@ -32,11 +32,28 @@ class Settings(BaseSettings):
     # Phase 3 Decision, Suppression & Notification Parameters
     SLACK_WEBHOOK_URL: Optional[str] = None
     SLACK_BOT_TOKEN: Optional[str] = None
+    SLACK_SIGNING_SECRET: Optional[str] = None
+    SLACK_CHANNEL_ID: Optional[str] = None
     SLACK_CHANNEL: str = "#alerts"
     SLACK_ENABLED: bool = False
+    DASHBOARD_BASE_URL: str = "http://localhost:8000"
     ALERT_COOLDOWN_SECONDS: int = 300          # 5-minute cooldown for repeated notifications
     ESCALATION_THRESHOLD_SECONDS: int = 600    # 10 minutes unresolved critical threshold
     ESCALATION_OCCURRENCE_THRESHOLD: int = 10  # 10 duplicate bursts triggering escalation
+
+    # Intelligent Unknown-Alert Resolution (Cloud AI)
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    AI_RESOLUTION_TIMEOUT_SECONDS: float = 12.0
+
+    # Real Email / SMTP Escalation Parameters
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USE_TLS: bool = True
+    ALERT_EMAIL_FROM: Optional[str] = None
+    ALERT_EMAIL_TO: Optional[str] = None
 
 
 settings = Settings()
