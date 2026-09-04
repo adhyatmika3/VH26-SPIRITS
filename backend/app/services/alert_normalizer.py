@@ -70,10 +70,25 @@ def normalize_alert(payload: AlertWebhookPayload) -> NormalizedAlertData:
         f"{payload.alert_name} alert triggered on service {payload.service}"
     )
 
-    # Ensure timestamp has timezone
+    # Ensure timezone on timestamp
     ts = payload.timestamp
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=timezone.utc)
+
+    # Preserve and normalize labels, inferring alert_type if absent
+    labels = dict(payload.labels or {})
+    if not (labels.get("alert_type") or labels.get("type") or labels.get("category")):
+        search_text = f"{payload.alert_name} {message}".lower()
+        if "cpu" in search_text:
+            labels["alert_type"] = "CPU_HIGH"
+        elif "memory" in search_text or "oom" in search_text:
+            labels["alert_type"] = "MEMORY_HIGH"
+        elif "disk" in search_text or "storage" in search_text:
+            labels["alert_type"] = "DISK_FULL"
+        elif "database" in search_text or "deadlock" in search_text:
+            labels["alert_type"] = "DATABASE_ERROR"
+        elif "latency" in search_text or "delay" in search_text:
+            labels["alert_type"] = "LATENCY_HIGH"
 
     return NormalizedAlertData(
         source=payload.source.strip().lower(),
@@ -84,6 +99,6 @@ def normalize_alert(payload: AlertWebhookPayload) -> NormalizedAlertData:
         status=normalized_status,
         message=str(message).strip(),
         timestamp=ts,
-        labels=payload.labels or {},
+        labels=labels,
         annotations=annotations
     )

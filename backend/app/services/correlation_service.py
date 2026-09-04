@@ -52,6 +52,24 @@ def correlate_and_assign_incident(
     )
     active_incidents = db.execute(stmt).scalars().all()
 
+    target_alert_type = str(
+        labels.get("alert_type") or 
+        labels.get("type") or 
+        labels.get("category") or ""
+    ).strip().upper()
+
+    def is_type_compatible(alt: CanonicalAlert) -> bool:
+        if not target_alert_type:
+            return True
+        alt_type = str(
+            alt.labels.get("alert_type") or 
+            alt.labels.get("type") or 
+            alt.labels.get("category") or ""
+        ).strip().upper()
+        if not alt_type:
+            return True
+        return alt_type == target_alert_type
+
     matched_incident: Optional[Incident] = None
 
     # Tier 1: Service + Environment + Cluster
@@ -60,7 +78,7 @@ def correlate_and_assign_incident(
             for alt in inc.alerts:
                 alt_env = str(alt.labels.get("environment") or alt.labels.get("env") or "").strip().lower()
                 alt_cluster = str(alt.labels.get("cluster") or "").strip().lower()
-                if alt_env == env and alt_cluster == cluster:
+                if alt_env == env and alt_cluster == cluster and is_type_compatible(alt):
                     matched_incident = inc
                     break
             if matched_incident:
@@ -71,7 +89,7 @@ def correlate_and_assign_incident(
         for inc in active_incidents:
             for alt in inc.alerts:
                 alt_env = str(alt.labels.get("environment") or alt.labels.get("env") or "").strip().lower()
-                if alt_env == env:
+                if alt_env == env and is_type_compatible(alt):
                     matched_incident = inc
                     break
             if matched_incident:
@@ -82,7 +100,7 @@ def correlate_and_assign_incident(
         for inc in active_incidents:
             for alt in inc.alerts:
                 alt_host = str(alt.labels.get("host") or alt.labels.get("instance") or "").strip().lower()
-                if alt_host == host:
+                if alt_host == host and is_type_compatible(alt):
                     matched_incident = inc
                     break
             if matched_incident:
@@ -124,7 +142,16 @@ def correlate_and_assign_incident(
     total_incidents = db.execute(count_stmt).scalar() or 0
     inc_number = f"INC-{1001 + total_incidents}"
 
-    title = f"{alert_name} degradation on {service}"
+    if target_alert_type == "CPU_HIGH":
+        title = f"{service.replace('-', ' ').title()} — High CPU Utilization"
+    elif target_alert_type == "DATABASE_ERROR":
+        title = f"{service.replace('-', ' ').title()} — Database Connection Error"
+    elif target_alert_type == "MEMORY_HIGH":
+        title = f"{service.replace('-', ' ').title()} — High Memory Utilization"
+    elif target_alert_type:
+        title = f"{service.replace('-', ' ').title()} — {target_alert_type.replace('_', ' ').title()}"
+    else:
+        title = f"{alert_name} degradation on {service}"
     init_status = "RESOLVED" if status.upper() == "RESOLVED" else "OPEN"
 
     new_incident = Incident(

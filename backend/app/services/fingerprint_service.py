@@ -25,8 +25,16 @@ def generate_fingerprint(
         if k.lower() not in VOLATILE_KEYS and v is not None
     }
 
+    alert_type = (
+        stable_labels.get("alert_type") or 
+        stable_labels.get("type") or 
+        stable_labels.get("category")
+    )
+    # Use stable alert_type if present so message variations share the exact fingerprint
+    alert_key = str(alert_type).strip().upper() if alert_type else alert_name.strip()
+
     fingerprint_payload = {
-        "alert_name": alert_name.strip(),
+        "alert_name": alert_key,
         "service": service.strip().lower(),
         "resource": resource.strip() if resource else "",
         "labels": stable_labels

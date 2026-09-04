@@ -13,6 +13,7 @@ api_router = APIRouter()
 api_router.include_router(health_router)
 api_router.include_router(metrics_router)  # /metrics
 api_router.include_router(alerts_router, prefix="/api/v1")
+api_router.include_router(alerts_router)
 api_router.include_router(incidents_router, prefix="/api/v1")
 api_router.include_router(decisions_router, prefix="/api/v1")
 api_router.include_router(notifications_router, prefix="/api/v1")

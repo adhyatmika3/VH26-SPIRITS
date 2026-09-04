@@ -49,3 +49,48 @@ class IncidentListResponse(BaseModel):
     limit: int
     items: List[IncidentResponse]
 
+
+class RunbookPrecheck(BaseModel):
+    id: str
+    name: str
+    status: str  # PASS, FAILING, DEGRADED
+    detail: str
+
+
+class RunbookStep(BaseModel):
+    index: int
+    title: str
+    action_type: str  # DRAIN, SCALE, RECYCLE, VERIFY
+    command: str
+    expected_duration: str
+    status: str = "PENDING"  # PENDING, RUNNING, COMPLETED, FAILED
+    output: Optional[str] = None
+
+
+class RunbookResponse(BaseModel):
+    incident_id: uuid.UUID
+    incident_number: str
+    service: str
+    sop_code: str
+    title: str
+    description: str
+    prechecks: List[RunbookPrecheck] = []
+    steps: List[RunbookStep] = []
+    status: str = "READY"  # READY, IN_PROGRESS, COMPLETED
+
+
+class RunbookExecuteRequest(BaseModel):
+    step_index: Optional[int] = None  # If None, executes all steps
+    actor: Optional[str] = "sre-operator"
+
+
+class RunbookExecuteResponse(BaseModel):
+    incident_id: uuid.UUID
+    step_index: Optional[int] = None
+    status: str  # SUCCESS, FAILED
+    logs: List[str] = []
+    completed_steps: List[int] = []
+    all_completed: bool = False
+    message: str
+
+

@@ -85,7 +85,8 @@ class DecisionExplanationResponse(BaseModel):
     decision: str
     what_happened: str = Field(..., description="Plain-English verdict of what the system did")
     why: str = Field(..., description="Context-aware reasoning in plain English")
-    confidence_label: str = Field(..., description="Qualitative confidence: 'High', 'Medium', or 'Low'")
+    confidence: Optional[float] = Field(None, description="Confidence score (null for deterministic rule evaluation, no fabricated numbers)")
+    confidence_label: Optional[str] = Field(None, description="Qualitative confidence indicator")
     evidence: List[str] = Field(default_factory=list, description="Specific evidence behind the decision")
     technical_details: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
@@ -115,3 +116,82 @@ class IncidentTimelineResponse(BaseModel):
     events: List[TimelineEventItem]
 
 
+# =====================================================
+# PHASE 7: DECISION INTELLIGENCE SCHEMAS
+# =====================================================
+
+class DecisionBreakdownItem(BaseModel):
+    """Count and percentage for a single decision type."""
+    decision_type: str = Field(..., description="NOTIFY, SUPPRESS, ESCALATE, or other")
+    human_label: str = Field(..., description="Human-friendly label e.g. 'Unnecessary Notification Prevented'")
+    count: int = Field(..., description="Actual count from decision_records table")
+    percentage: Optional[float] = Field(None, description="Percentage of total decisions. Null if total is 0.")
+
+
+class ReasonCountItem(BaseModel):
+    """A single reason_code and its occurrence count."""
+    reason_code: str = Field(..., description="Raw technical reason code from decision engine")
+    human_label: str = Field(..., description="Plain-English translation of the reason code")
+    count: int = Field(..., description="Number of decisions with this reason code")
+
+
+class DecisionExplorerItem(BaseModel):
+    """A single row in the Decision Explorer table."""
+    decision_record_id: uuid.UUID
+    timestamp: datetime
+    alert_id: Optional[uuid.UUID] = None
+    alert_name: Optional[str] = None
+    service: Optional[str] = None
+    severity: Optional[str] = None
+    decision: str
+    human_decision: str = Field(..., description="Human-friendly decision label")
+    reason_summary: str = Field(..., description="Short human-readable reason")
+    incident_id: Optional[uuid.UUID] = None
+
+
+class ProcessingPerformanceMetrics(BaseModel):
+    """Decision processing time statistics from real processing_time_ms values."""
+    total_decisions_with_timing: int = Field(0, description="Count of decisions that have processing_time_ms recorded")
+    avg_processing_ms: Optional[float] = Field(None, description="Average processing time in milliseconds. Null if no data.")
+    min_processing_ms: Optional[float] = Field(None, description="Fastest decision in milliseconds. Null if no data.")
+    max_processing_ms: Optional[float] = Field(None, description="Slowest decision in milliseconds. Null if no data.")
+
+
+class OutcomeMetrics(BaseModel):
+    """Decision quality / outcome metrics from real incident data."""
+    total_incidents: int = 0
+    acknowledged_incidents: int = 0
+    resolved_incidents: int = 0
+    unresolved_incidents: int = 0
+    mtta_seconds: Optional[float] = Field(None, description="Avg time to acknowledge. Null if no acknowledged incidents.")
+    mtta_formatted: Optional[str] = Field(None, description="Human-friendly MTTA or null.")
+    mttr_seconds: Optional[float] = Field(None, description="Avg time to resolve. Null if no resolved incidents.")
+    mttr_formatted: Optional[str] = Field(None, description="Human-friendly MTTR or null.")
+
+
+class DecisionIntelligenceResponse(BaseModel):
+    """
+    Phase 7: Complete decision intelligence payload.
+    Every value is derived from actual PostgreSQL data.
+    No fabricated metrics, percentages, or confidence scores.
+    """
+    has_data: bool = Field(False, description="True if at least 1 decision record exists")
+    total_decisions: int = Field(0, description="Total decision records in database")
+
+    # Decision breakdown
+    breakdown: List[DecisionBreakdownItem] = Field(default_factory=list)
+
+    # Top reasons alerts were suppressed
+    top_suppression_reasons: List[ReasonCountItem] = Field(default_factory=list)
+
+    # Why alerts reached responders
+    top_notification_reasons: List[ReasonCountItem] = Field(default_factory=list)
+
+    # Recent decisions for explorer table
+    recent_decisions: List[DecisionExplorerItem] = Field(default_factory=list)
+
+    # Processing performance
+    processing_performance: ProcessingPerformanceMetrics = Field(default_factory=ProcessingPerformanceMetrics)
+
+    # Outcome metrics
+    outcomes: OutcomeMetrics = Field(default_factory=OutcomeMetrics)

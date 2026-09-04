@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -8,8 +8,17 @@ from app.models.raw_alert import RawAlert
 from app.models.canonical_alert import CanonicalAlert
 from app.models.incident import Incident
 from app.schemas.webhook import AlertWebhookPayload, WebhookIngestResponse
-from app.schemas.alert import CanonicalAlertResponse, AlertListResponse, AlertStatsResponse
+from app.schemas.alert import (
+    CanonicalAlertResponse,
+    AlertListResponse,
+    AlertStatsResponse,
+    RawAlertResponse,
+    RawAlertListResponse,
+    AlertSimulateRequest,
+    AlertSimulateResponse
+)
 from app.services.alert_processor import process_alert_pipeline
+from app.services.alert_simulator import run_alert_simulation
 from app.services.storm_detector import detect_alert_storm
 from datetime import datetime, timezone
 
@@ -145,6 +154,83 @@ def get_alert_stats(db: Session = Depends(get_db)):
         active_incidents_count=active_incidents,
         severity_breakdown=severity_breakdown,
         top_services=top_services
+    )
+
+
+@router.post(
+    "/simulate",
+    response_model=AlertSimulateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Simulate real-time alert injection and normalization",
+    description="Dispatches requested number of alerts via real HTTP requests to the webhook pipeline, demonstrating 500->1 normalization without deleting raw records."
+)
+async def simulate_alerts_endpoint(
+    request: Request,
+    payload: AlertSimulateRequest
+):
+    report = await run_alert_simulation(
+        app=request.app,
+        count=payload.count,
+        service=payload.service,
+        alert_type=payload.alert_type,
+        severity=payload.severity,
+        environment=payload.environment,
+        delay_ms=payload.delay_ms,
+        scenario=payload.scenario
+    )
+    return AlertSimulateResponse(
+        requested=report.requested,
+        generated=report.generated,
+        status=report.status,
+        service=report.service,
+        alert_type=report.alert_type,
+        severity=report.severity,
+        environment=report.environment,
+        raw_alerts_count=report.raw_alerts_count,
+        core_incidents_created=report.core_incidents_created,
+        alert_reduction_percent=report.alert_reduction_percent,
+        primary_incident_id=report.primary_incident_id,
+        primary_incident_number=report.primary_incident_number,
+        primary_incident_title=report.primary_incident_title,
+        primary_incident_occurrences=report.primary_incident_occurrences,
+        primary_fingerprint=report.primary_fingerprint,
+        incidents_summary=report.incidents_summary,
+        sample_variations=report.sample_variations
+    )
+
+
+@router.get(
+    "/raw",
+    response_model=RawAlertListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List raw ingested alerts",
+    description="Retrieve all raw alerts stored in PostgreSQL with filtering and pagination."
+)
+def list_raw_alerts(
+    service: Optional[str] = Query(None, description="Filter by service"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=500, description="Page limit"),
+    db: Session = Depends(get_db)
+):
+    offset = (page - 1) * limit
+    stmt = select(RawAlert)
+    if service:
+        stmt = stmt.where(RawAlert.service == service.lower())
+    if severity:
+        stmt = stmt.where(RawAlert.severity == severity.lower())
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = db.execute(count_stmt).scalar() or 0
+
+    items_stmt = stmt.order_by(RawAlert.received_at.desc()).offset(offset).limit(limit)
+    items = db.execute(items_stmt).scalars().all()
+
+    return RawAlertListResponse(
+        total=total,
+        page=page,
+        limit=limit,
+        items=items
     )
 
 
