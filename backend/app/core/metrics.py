@@ -1,4 +1,23 @@
-from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+# Ingestion & Processing Counters
+ALERTS_RECEIVED_TOTAL = Counter(
+    "alerts_received_total",
+    "Total count of raw alerts ingested into the platform",
+    ["source", "severity"]
+)
+
+ALERTS_PROCESSED_TOTAL = Counter(
+    "alerts_processed_total",
+    "Total count of alerts processed through the intelligence pipeline",
+    ["source", "severity", "decision"]
+)
+
+ALERT_PROCESSING_FAILURES_TOTAL = Counter(
+    "alert_processing_failures_total",
+    "Total count of failures encountered during alert processing pipeline",
+    ["stage"]
+)
 
 # Decision Metrics
 ALERTS_DECIDED_TOTAL = Counter(
@@ -38,6 +57,38 @@ NOTIFICATION_FAILURE_TOTAL = Counter(
     ["channel"]
 )
 
+NOTIFICATION_FAILURES_TOTAL = Counter(
+    "notification_failures_total",
+    "Total notification delivery failure count",
+    ["channel"]
+)
+
+# Processing Latency Histograms
+ALERT_PROCESSING_DURATION_SECONDS = Histogram(
+    "alert_processing_duration_seconds",
+    "Time required to process an alert through the intelligence pipeline",
+    ["stage"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 10.0)
+)
+
+NOTIFICATION_DURATION_SECONDS = Histogram(
+    "notification_duration_seconds",
+    "Time taken to deliver notification to downstream channel",
+    ["channel"],
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
+)
+
+# Active State Gauges
+ALERTS_IN_PROCESSING = Gauge(
+    "alerts_in_processing",
+    "Current count of alerts actively undergoing processing in pipeline"
+)
+
+ACTIVE_INCIDENTS_GAUGE = Gauge(
+    "active_incidents_count",
+    "Current count of open or in-progress incidents"
+)
+
 # Lifecycle Metrics
 ALERT_ACKNOWLEDGEMENTS_TOTAL = Counter(
     "alert_acknowledgements_total",
@@ -51,11 +102,38 @@ ALERT_RESOLUTIONS_TOTAL = Counter(
     ["service"]
 )
 
-# Active Incidents Gauge
-ACTIVE_INCIDENTS_GAUGE = Gauge(
-    "active_incidents_count",
-    "Current count of open or in-progress incidents"
-)
+
+def record_received_metric(source: str, severity: str) -> None:
+    ALERTS_RECEIVED_TOTAL.labels(
+        source=(source or "unknown").lower(),
+        severity=(severity or "medium").upper()
+    ).inc()
+
+
+def record_processed_metric(source: str, severity: str, decision: str) -> None:
+    ALERTS_PROCESSED_TOTAL.labels(
+        source=(source or "unknown").lower(),
+        severity=(severity or "medium").upper(),
+        decision=(decision or "unknown").upper()
+    ).inc()
+
+
+def record_processing_failure_metric(stage: str) -> None:
+    ALERT_PROCESSING_FAILURES_TOTAL.labels(
+        stage=(stage or "unknown").lower()
+    ).inc()
+
+
+def record_processing_duration(stage: str, duration: float) -> None:
+    ALERT_PROCESSING_DURATION_SECONDS.labels(
+        stage=(stage or "pipeline").lower()
+    ).observe(duration)
+
+
+def record_notification_duration(channel: str, duration: float) -> None:
+    NOTIFICATION_DURATION_SECONDS.labels(
+        channel=(channel or "slack").lower()
+    ).observe(duration)
 
 
 def record_decision_metric(decision: str, severity: str, environment: str, service: str, reason_codes: list[str]) -> None:
@@ -75,27 +153,29 @@ def record_decision_metric(decision: str, severity: str, environment: str, servi
 
 
 def record_notification_metric(channel: str, success: bool, priority: str = "MEDIUM", service: str = "unknown") -> None:
+    ch = (channel or "slack").lower()
     if success:
-        NOTIFICATION_SUCCESS_TOTAL.labels(channel=channel.lower()).inc()
+        NOTIFICATION_SUCCESS_TOTAL.labels(channel=ch).inc()
         ALERTS_NOTIFIED_TOTAL.labels(
-            priority=priority.upper(),
-            channel=channel.lower(),
-            service=service.lower()
+            priority=(priority or "MEDIUM").upper(),
+            channel=ch,
+            service=(service or "unknown").lower()
         ).inc()
     else:
-        NOTIFICATION_FAILURE_TOTAL.labels(channel=channel.lower()).inc()
+        NOTIFICATION_FAILURE_TOTAL.labels(channel=ch).inc()
+        NOTIFICATION_FAILURES_TOTAL.labels(channel=ch).inc()
 
 
 def record_escalation_metric(severity: str, service: str) -> None:
     ALERTS_ESCALATED_TOTAL.labels(
-        severity=severity.upper(),
-        service=service.lower()
+        severity=(severity or "HIGH").upper(),
+        service=(service or "unknown").lower()
     ).inc()
 
 
 def record_acknowledgement_metric(service: str) -> None:
-    ALERT_ACKNOWLEDGEMENTS_TOTAL.labels(service=service.lower()).inc()
+    ALERT_ACKNOWLEDGEMENTS_TOTAL.labels(service=(service or "unknown").lower()).inc()
 
 
 def record_resolution_metric(service: str) -> None:
-    ALERT_RESOLUTIONS_TOTAL.labels(service=service.lower()).inc()
+    ALERT_RESOLUTIONS_TOTAL.labels(service=(service or "unknown").lower()).inc()

@@ -1,9 +1,17 @@
+import time
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.core.logging import logger
-from app.core.metrics import record_decision_metric
+from app.core.metrics import (
+    record_decision_metric,
+    record_received_metric,
+    record_processed_metric,
+    record_processing_failure_metric,
+    record_processing_duration,
+    ALERTS_IN_PROCESSING
+)
 from app.models.raw_alert import RawAlert
 from app.models.canonical_alert import CanonicalAlert
 from app.models.incident import Incident
@@ -46,6 +54,14 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
     Stage 3: Decision Engine, Suppression, Escalation & Slack Dispatch (DecisionRecord, EscalationRecord, NotificationRecord)
     """
     now = datetime.now(timezone.utc)
+
+    # Record received metric & increment active processing gauge
+    record_received_metric(
+        source=payload.source,
+        severity=payload.severity or "medium"
+    )
+    ALERTS_IN_PROCESSING.inc()
+    start_perf = time.perf_counter()
 
     # ----------------------------------------------------
     # Stage 1: Raw Audit Ingestion (Immutable Audit Trail)
@@ -153,7 +169,10 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
             current_time=now
         )
 
-        # 9. Create DecisionRecord (Audit trail of every decision)
+        # 9. Create DecisionRecord (Audit trail of every decision with latency)
+        duration_sec = time.perf_counter() - start_perf
+        duration_ms = round(duration_sec * 1000.0, 2)
+
         decision_record = DecisionRecord(
             canonical_alert_id=canonical_alert.id,
             incident_id=incident.id,
@@ -171,12 +190,20 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
                 "incident_number": incident.incident_number,
                 "incident_status": incident.status
             },
+            processing_time_ms=duration_ms,
             created_at=now
         )
         db.add(decision_record)
         db.flush()
 
-        # 10. Record Prometheus Decision Metric
+        # 10. Record Prometheus Metrics (Decision, Latency, Processed)
+        record_processing_duration(stage="pipeline", duration=duration_sec)
+        record_processed_metric(
+            source=normalized.source,
+            severity=canonical_alert.severity,
+            decision=decision_outcome.decision
+        )
+
         env_label = normalized.labels.get("environment") or "production"
         record_decision_metric(
             decision=decision_outcome.decision,
@@ -249,6 +276,9 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
         )
 
     except Exception as exc:
+        record_processing_failure_metric(stage="pipeline")
         db.rollback()
         logger.error(f"Error in Alert Processing Pipeline for raw alert [{raw_alert.id}]: {exc}", exc_info=True)
         raise exc
+    finally:
+        ALERTS_IN_PROCESSING.dec()

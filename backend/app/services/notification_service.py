@@ -1,9 +1,10 @@
+import time
 from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.metrics import record_notification_metric
+from app.core.metrics import record_notification_metric, record_notification_duration
 from app.models.canonical_alert import CanonicalAlert
 from app.models.incident import Incident
 from app.models.decision_record import DecisionRecord
@@ -47,7 +48,10 @@ def dispatch_notification(
     )
 
     # 2. Dispatch
+    start_notif = time.perf_counter()
     result = slack_notifier.send_slack_notification(payload=raw_payload)
+    notif_dur = time.perf_counter() - start_notif
+    record_notification_duration(channel=channel, duration=notif_dur)
     status = result["status"]
     err = result.get("error")
 

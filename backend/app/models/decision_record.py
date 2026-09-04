@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import String, DateTime, ForeignKey
+from sqlalchemy import String, DateTime, ForeignKey, Float
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -57,6 +57,10 @@ class DecisionRecord(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         index=True
+    )
+    processing_time_ms: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True
     )
 
     # Relationships

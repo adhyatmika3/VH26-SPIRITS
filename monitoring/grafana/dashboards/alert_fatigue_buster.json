@@ -1,0 +1,288 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "type": "timeseries",
+      "title": "Panel 1 — Total Alert Volume",
+      "description": "Alerts received over time across all sources and severities",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(alerts_received_total[1m]))",
+          "legendFormat": "Ingress Rate (alerts/s)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(alerts_received_total[5m]))",
+          "legendFormat": "Volume (last 5m)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": { "h": 8, "w": 4, "x": 12, "y": 0 },
+      "type": "gauge",
+      "title": "Panel 2 — Suppression Rate",
+      "description": "Percentage of alerts suppressed by intelligence engine",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "100 * (sum(rate(alerts_decided_total{decision=\"SUPPRESS\"}[5m])) or sum(alerts_decided_total{decision=\"SUPPRESS\"})) / clamp_min((sum(rate(alerts_decided_total[5m])) or sum(alerts_decided_total)), 0.0001)",
+          "legendFormat": "Suppression %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 40 },
+              { "color": "green", "value": 70 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 0 },
+      "type": "gauge",
+      "title": "Panel 3 — Notification Rate",
+      "description": "Percentage of alerts forwarded to notification channels",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "100 * (sum(rate(alerts_decided_total{decision=\"NOTIFY\"}[5m])) or sum(alerts_decided_total{decision=\"NOTIFY\"})) / clamp_min((sum(rate(alerts_decided_total[5m])) or sum(alerts_decided_total)), 0.0001)",
+          "legendFormat": "Notification %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 30 },
+              { "color": "red", "value": 60 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 0 },
+      "type": "gauge",
+      "title": "Panel 4 — Escalation Rate",
+      "description": "Percentage of alerts escalated due to high severity or repeated occurrences",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "100 * (sum(rate(alerts_decided_total{decision=\"ESCALATE\"}[5m])) or sum(alerts_decided_total{decision=\"ESCALATE\"})) / clamp_min((sum(rate(alerts_decided_total[5m])) or sum(alerts_decided_total)), 0.0001)",
+          "legendFormat": "Escalation %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 15 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "type": "timeseries",
+      "title": "Panel 5 — Alert Decisions",
+      "description": "Distribution of SUPPRESS, NOTIFY, and ESCALATE decisions over time",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (decision) (rate(alerts_decided_total[1m]))",
+          "legendFormat": "{{decision}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "stacking": { "mode": "normal", "group": "A" },
+            "fillOpacity": 35
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "type": "piechart",
+      "title": "Panel 6 — Severity Distribution",
+      "description": "Alert volume breakdown across CRITICAL, ERROR/HIGH, WARNING/MEDIUM, INFO/LOW",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (severity) (alerts_processed_total)",
+          "legendFormat": "{{severity}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "type": "barchart",
+      "title": "Panel 7 — Top Noisy Services",
+      "description": "Ranking of microservices generating the highest volume of alert noise",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (service) (alerts_decided_total))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "type": "timeseries",
+      "title": "Panel 8 — Processing Latency",
+      "description": "Average, P95, and P99 intelligence pipeline processing duration",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(alert_processing_duration_seconds_sum[1m])) / sum(rate(alert_processing_duration_seconds_count[1m]))",
+          "legendFormat": "Avg Latency",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(alert_processing_duration_seconds_bucket[1m])))",
+          "legendFormat": "P95 Latency",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(alert_processing_duration_seconds_bucket[1m])))",
+          "legendFormat": "P99 Latency",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 24 },
+      "type": "timeseries",
+      "title": "Panel 9 — Processing Failures",
+      "description": "Failures encountered during intelligence ingestion and correlation pipeline",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (stage) (rate(alert_processing_failures_total[1m]))",
+          "legendFormat": "Failures: {{stage}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 24 },
+      "type": "timeseries",
+      "title": "Panel 10 — Notification Failures",
+      "description": "Notification delivery failures to downstream channels such as Slack",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (channel) (rate(notification_failure_total[1m]))",
+          "legendFormat": "Delivery Failures: {{channel}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "orange" }
+        }
+      }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["alert-fatigue-buster", "sre", "observability"],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+  },
+  "timezone": "utc",
+  "title": "Alert Fatigue Buster — Observability & Intelligence",
+  "uid": "alert-fatigue-buster-overview",
+  "version": 1
+}

@@ -28,6 +28,7 @@
     renderAlertGroups();
     renderIncidentsList();
     renderSelectedIncident(state.selectedIncidentId);
+    fetchLiveAnalytics();
     startAutoRefresh();
     setupShortcutKeys();
   }
@@ -411,12 +412,35 @@
       state.countdown -= 1;
       if (state.countdown <= 0) {
         state.countdown = 2;
+        fetchLiveAnalytics();
         simulateIngressTick();
       }
       if (elements.countdownTag) {
         elements.countdownTag.innerText = `${state.countdown}s`;
       }
     }, 1000);
+  }
+
+  // Live Backend Analytics Integration (Phase 4)
+  async function fetchLiveAnalytics() {
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/analytics/overview');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.total_alerts > 0) {
+          state.stats.incomingAlerts = data.total_alerts;
+          state.stats.actionableAlerts = data.notified_alerts + data.escalated_alerts;
+          state.stats.fatigueAbsorptionPercent = data.suppression_rate;
+          state.stats.activeDedupePool = data.suppressed_alerts;
+          if (data.average_processing_time_ms > 0) {
+            state.stats.ingressVelocity = data.average_processing_time_ms;
+          }
+          renderStats();
+        }
+      }
+    } catch (err) {
+      // Graceful fallback if backend server is not running or offline
+    }
   }
 
   window.toggleAutoRefresh = function () {

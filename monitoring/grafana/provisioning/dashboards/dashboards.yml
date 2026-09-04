@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: "Alert Fatigue Buster Dashboards"
+    orgId: 1
+    folder: "Alert Fatigue Buster"
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
