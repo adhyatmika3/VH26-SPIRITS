@@ -9,6 +9,7 @@ from app.api.routes.metrics import router as metrics_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.integrations import router as integrations_router
+from app.api.routes.load_test import router as load_test_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
@@ -27,5 +28,9 @@ api_router.include_router(dashboard_router, prefix="/api")
 api_router.include_router(integrations_router, prefix="/api/v1")
 api_router.include_router(integrations_router, prefix="/api")
 api_router.include_router(integrations_router)
+api_router.include_router(load_test_router, prefix="/api/v1")
+api_router.include_router(load_test_router, prefix="/api")
+api_router.include_router(load_test_router)
+
 
 

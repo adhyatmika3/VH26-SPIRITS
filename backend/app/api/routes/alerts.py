@@ -22,7 +22,27 @@ from app.services.alert_simulator import run_alert_simulation
 from app.services.storm_detector import detect_alert_storm
 from datetime import datetime, timezone
 
+import asyncio
+from starlette.concurrency import run_in_threadpool
+
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
+
+# Bounded pipeline execution concurrency and backpressure controller
+MAX_CONCURRENT_PIPELINE = 20
+MAX_QUEUE_BACKLOG = 5000
+_pipeline_semaphore = asyncio.Semaphore(MAX_CONCURRENT_PIPELINE)
+_in_flight_count = 0
+_queue_backlog_count = 0
+
+
+def get_ingestion_backlog_status() -> dict:
+    """Returns current real-time ingestion in-flight and backlog telemetry."""
+    return {
+        "in_flight": _in_flight_count,
+        "backlog": _queue_backlog_count,
+        "max_concurrent": MAX_CONCURRENT_PIPELINE,
+        "max_queue": MAX_QUEUE_BACKLOG
+    }
 
 
 @router.post(
@@ -30,13 +50,34 @@ router = APIRouter(prefix="/alerts", tags=["Alerts"])
     response_model=WebhookIngestResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Ingest and process alert webhook",
-    description="Validates, normalizes, deduplicates, correlates, and persists alert webhooks."
+    description="Validates, normalizes, deduplicates, correlates, and persists alert webhooks with concurrency control and backpressure."
 )
-def receive_alert_webhook(
+async def receive_alert_webhook(
     payload: AlertWebhookPayload,
     db: Session = Depends(get_db)
 ):
-    result = process_alert_pipeline(db=db, payload=payload)
+    global _queue_backlog_count, _in_flight_count
+
+    # Backpressure check
+    if _queue_backlog_count >= MAX_QUEUE_BACKLOG:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Ingestion backpressure: queue capacity exceeded, retry shortly"
+        )
+
+    _queue_backlog_count += 1
+    try:
+        async with _pipeline_semaphore:
+            _queue_backlog_count = max(0, _queue_backlog_count - 1)
+            _in_flight_count += 1
+            try:
+                result = await run_in_threadpool(process_alert_pipeline, db=db, payload=payload)
+            finally:
+                _in_flight_count = max(0, _in_flight_count - 1)
+    except Exception:
+        _queue_backlog_count = max(0, _queue_backlog_count - 1)
+        raise
+
     return WebhookIngestResponse(
         accepted=True,
         alert_id=str(result.raw_alert.id),
