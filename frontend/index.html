@@ -384,15 +384,51 @@
           
           <!-- Graph C: Incident Severity / Risk Distribution -->
           <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col justify-between">
-            <div class="pb-3 mb-2 border-b border-surface-container-highest">
-              <h3 class="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-[18px] text-red-600">donut_large</span>
-                Incident Risk Distribution
-              </h3>
-              <span class="text-[11px] text-secondary font-code-sm">Active incidents grouped by assessed risk tier (CRITICAL, HIGH, MEDIUM, LOW)</span>
+            <div class="pb-3 mb-2 border-b border-surface-container-highest flex items-center justify-between">
+              <div>
+                <h3 class="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-[18px] text-red-600">donut_large</span>
+                  Incident Risk Distribution
+                </h3>
+                <span class="text-[11px] text-secondary font-code-sm">Active incidents grouped by assessed risk tier (CRITICAL, HIGH, MEDIUM, LOW)</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span id="risk-chart-total" class="px-2 py-0.5 rounded font-code-sm text-[11px] font-bold bg-surface-container text-on-surface border border-surface-container-highest">0 Total</span>
+              </div>
             </div>
-            <div class="relative w-full h-60 flex items-center justify-center">
+            <div class="relative w-full h-56 flex items-center justify-center">
               <canvas id="chart-incident-priority"></canvas>
+            </div>
+            <!-- 4-Tier Legend with Live Counts & Percentage Pills -->
+            <div id="risk-distribution-pills" class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 mt-2 border-t border-surface-container-highest text-xs font-code-sm">
+              <div class="flex items-center gap-2 p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[10px] uppercase font-bold text-red-700 dark:text-red-400">Critical</div>
+                  <div class="font-bold text-on-surface text-xs" id="risk-count-critical">0 <span class="text-[10px] text-secondary font-normal">(0%)</span></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 p-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/50">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[10px] uppercase font-bold text-orange-700 dark:text-orange-400">High</div>
+                  <div class="font-bold text-on-surface text-xs" id="risk-count-high">0 <span class="text-[10px] text-secondary font-normal">(0%)</span></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400">Medium</div>
+                  <div class="font-bold text-on-surface text-xs" id="risk-count-medium">0 <span class="text-[10px] text-secondary font-normal">(0%)</span></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400">Low</div>
+                  <div class="font-bold text-on-surface text-xs" id="risk-count-low">0 <span class="text-[10px] text-secondary font-normal">(0%)</span></div>
+                </div>
+              </div>
             </div>
           </div>
 

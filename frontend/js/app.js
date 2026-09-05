@@ -55,6 +55,21 @@
       resolved_by: 'Alex Rivera (Staff SRE)',
       commander: 'Alex Rivera (Staff SRE)',
       description: 'DDoS mitigation heuristic falsely throttled mobile push tokens. Rate limit quota adjusted to 15,000 req/min.'
+    },
+    {
+      id: 'inc-cluster-8818',
+      incident_number: 'INC-8818',
+      title: 'TLS Certificate Expiry Notice (< 30 days remaining)',
+      service: 'edge-proxy',
+      status: 'OPEN',
+      priority: 'LOW',
+      severity: 'LOW',
+      alert_count: 3,
+      unique_alerts_count: 1,
+      first_seen: new Date(Date.now() - 240 * 60000).toISOString(),
+      created_at: new Date(Date.now() - 240 * 60000).toISOString(),
+      commander: 'CertManager Bot',
+      description: 'Wildcard TLS certificate for *.api.internal expires in 28 days. Scheduled automated cert-manager rotation verified.'
     }
   ];
 
@@ -944,7 +959,7 @@
     });
   }
 
-  // Graph C: Incident Severity / Risk Distribution
+  // Graph C: Incident Severity / Risk Distribution (All 4 Tiers: Critical, High, Medium, Low)
   async function renderIncidentPriorityChart() {
     const canvas = document.getElementById('chart-incident-priority');
     if (!canvas || typeof Chart === 'undefined') return;
@@ -962,42 +977,93 @@
     destroyChart('chart-incident-priority');
 
     const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-    items.forEach((item) => {
-      const p = (item.priority || '').toUpperCase();
-      if (counts[p] !== undefined) counts[p] = item.count;
-    });
+    if (Array.isArray(items) && items.length > 0) {
+      items.forEach((item) => {
+        const p = (item.priority || '').toUpperCase();
+        if (counts[p] !== undefined) counts[p] = Number(item.count) || 0;
+      });
+    }
 
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    // If API returned all 0s or was unreachable, calculate from local state incidents
+    let total = Object.values(counts).reduce((a, b) => a + b, 0);
+    if (total === 0 && Array.isArray(state.incidents) && state.incidents.length > 0) {
+      state.incidents.forEach((inc) => {
+        const p = (inc.priority || inc.severity || 'MEDIUM').toUpperCase();
+        if (counts[p] !== undefined) counts[p] += 1;
+        else counts.MEDIUM += 1;
+      });
+      total = Object.values(counts).reduce((a, b) => a + b, 0);
+    }
+
+    // Update UI Stats Badges & Pills
+    const pct = (val) => total > 0 ? Math.round((val / total) * 100) : 0;
+    const elCrit = document.getElementById('risk-count-critical');
+    const elHigh = document.getElementById('risk-count-high');
+    const elMed = document.getElementById('risk-count-medium');
+    const elLow = document.getElementById('risk-count-low');
+    const elTotal = document.getElementById('risk-chart-total');
+
+    if (elCrit) elCrit.innerHTML = `${counts.CRITICAL} <span class="text-[10px] text-secondary font-normal">(${pct(counts.CRITICAL)}%)</span>`;
+    if (elHigh) elHigh.innerHTML = `${counts.HIGH} <span class="text-[10px] text-secondary font-normal">(${pct(counts.HIGH)}%)</span>`;
+    if (elMed) elMed.innerHTML = `${counts.MEDIUM} <span class="text-[10px] text-secondary font-normal">(${pct(counts.MEDIUM)}%)</span>`;
+    if (elLow) elLow.innerHTML = `${counts.LOW} <span class="text-[10px] text-secondary font-normal">(${pct(counts.LOW)}%)</span>`;
+    if (elTotal) elTotal.innerText = `${total} Total`;
+
+    // Visual dataset: if total > 0 use true counts; if 0, show baseline equal proportions with unique colors
+    const chartData = total > 0 
+      ? [counts.CRITICAL, counts.HIGH, counts.MEDIUM, counts.LOW]
+      : [1, 1, 1, 1];
 
     const ctx = canvas.getContext('2d');
     chartInstances['chart-incident-priority'] = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['Critical', 'High', 'Medium', 'Low'],
+        labels: ['Critical (P1)', 'High (P2)', 'Medium (P3)', 'Low (P4)'],
         datasets: [{
-          data: total > 0 ? [counts.CRITICAL, counts.HIGH, counts.MEDIUM, counts.LOW] : [0, 0, 0, 0],
-          backgroundColor: ['#dc2626', '#ea580c', '#f59e0b', '#3b82f6'],
+          data: chartData,
+          backgroundColor: [
+            '#ef4444', // Critical: Vibrant Crimson Red
+            '#f97316', // High: Vivid Sunset Orange
+            '#f59e0b', // Medium: Warm Amber / Gold
+            '#3b82f6'  // Low: Electric Azure Blue
+          ],
+          hoverBackgroundColor: [
+            '#dc2626',
+            '#ea580c',
+            '#d97706',
+            '#2563eb'
+          ],
           borderWidth: 2,
           borderColor: '#ffffff',
-          hoverOffset: 4
+          hoverOffset: 6
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '72%',
+        cutout: '70%',
         plugins: {
           legend: {
             position: 'bottom',
             labels: {
               boxWidth: 10,
-              padding: 10,
-              font: { family: 'Geist', size: 10 }
+              boxHeight: 10,
+              padding: 8,
+              usePointStyle: true,
+              pointStyle: 'circle',
+              font: { family: 'Geist', size: 10, weight: '600' }
             }
           },
           tooltip: {
             callbacks: {
-              label: (context) => ` ${context.label}: ${context.parsed} incidents`
+              label: (context) => {
+                const label = context.label || '';
+                const idx = context.dataIndex;
+                const rawKeys = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+                const count = counts[rawKeys[idx]] || 0;
+                const p = pct(count);
+                return ` ${label}: ${count} incident${count !== 1 ? 's' : ''} (${p}%)`;
+              }
             }
           }
         }
@@ -1472,16 +1538,20 @@
       const card = document.createElement('div');
       const isCrit = inc.priority === 'CRITICAL' || inc.severity === 'CRITICAL';
       const isHigh = inc.priority === 'HIGH' || inc.severity === 'HIGH';
-      const level = inc.priority || inc.severity || 'MEDIUM';
+      const isMed = inc.priority === 'MEDIUM' || inc.severity === 'MEDIUM';
+      const isLow = inc.priority === 'LOW' || inc.severity === 'LOW';
+      const level = inc.priority || inc.severity || (isCrit ? 'CRITICAL' : isHigh ? 'HIGH' : isMed ? 'MEDIUM' : 'LOW');
       const levelBadge = isCrit 
-        ? 'bg-red-100 text-red-800' 
-        : isHigh ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800';
+        ? 'bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-900/50' 
+        : isHigh ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border border-orange-200 dark:border-orange-900/50' 
+        : isMed ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50'
+        : 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50';
 
       const durationMin = inc.first_seen
         ? Math.max(1, Math.round((Date.now() - new Date(inc.first_seen).getTime()) / 60000))
         : 5;
 
-      const riskScore = inc.risk_score || (isCrit ? 98 : isHigh ? 82 : 45);
+      const riskScore = inc.risk_score || (isCrit ? 98 : isHigh ? 82 : isMed ? 45 : 18);
 
       card.className = `p-4 bg-surface-container-lowest rounded-2xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-primary transition-all`;
 
