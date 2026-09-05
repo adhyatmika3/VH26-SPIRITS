@@ -56,7 +56,8 @@ def evaluate_alert_decision(
     # -------------------------------------------------------------------------
     # 1. New Incident Evaluation (First occurrence for this incident)
     # -------------------------------------------------------------------------
-    if last_notified is None:
+    has_prior_notif = last_notified is not None or incident.alert_count > 1
+    if not has_prior_notif:
         if is_prod or severity in ["CRITICAL", "HIGH", "ERROR"] or priority in ["CRITICAL", "HIGH"]:
             reason_codes = ["NEW_INCIDENT", f"{severity}_SEVERITY"]
             if is_prod:

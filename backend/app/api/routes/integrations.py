@@ -99,3 +99,46 @@ async def handle_interactions(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process Slack action: {str(exc)}"
         )
+
+
+@router.post(
+    "/retry",
+    status_code=status.HTTP_200_OK,
+    summary="Trigger Slack Notification Retries",
+    description="Processes pending/retrying Slack notifications queued during an outage with exponential backoff and duplicate protection."
+)
+def trigger_slack_retries(
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """
+    Executes retry worker pass for pending/retrying Slack notifications.
+    """
+    from app.services.slack_retry_service import process_pending_slack_retries
+    result = process_pending_slack_retries(db=db, max_records=limit)
+    return {
+        "status": "ok",
+        "result": result
+    }
+
+
+@router.get(
+    "/pending",
+    status_code=status.HTTP_200_OK,
+    summary="List Pending Slack Notifications",
+    description="Returns pending, retrying, and in-flight Slack notifications awaiting delivery."
+)
+def list_pending_notifications(
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieves list of queued Slack notifications awaiting retry.
+    """
+    from app.services.slack_retry_service import get_pending_slack_notifications
+    records = get_pending_slack_notifications(db=db, limit=limit)
+    return {
+        "status": "ok",
+        "count": len(records),
+        "notifications": records
+    }

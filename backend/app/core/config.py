@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     ESCALATION_THRESHOLD_SECONDS: int = 600    # 10 minutes unresolved critical threshold
     ESCALATION_OCCURRENCE_THRESHOLD: int = 10  # 10 duplicate bursts triggering escalation
 
+    # Phase 7 Slack Resilience & Retry Parameters
+    SLACK_MAX_RETRIES: int = 5
+    SLACK_RETRY_BASE_SECONDS: int = 5
+    SLACK_NOTIFICATION_TIMEOUT_SECONDS: int = 10
+
     # Intelligent Unknown-Alert Resolution (Cloud AI)
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-2.5-flash"

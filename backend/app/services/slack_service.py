@@ -221,31 +221,134 @@ def build_incident_blocks(
     }
 
 
+def classify_slack_error(exc: Any) -> tuple[bool, Optional[int]]:
+    """
+    Classifies a Slack exception/error into:
+    - is_transient (bool): True if error is temporary (rate limit, timeout, 5xx, network glitch)
+    - retry_after (int | None): Seconds to wait before retry if provided by Slack (e.g. 429 Retry-After)
+    """
+    if exc is None:
+        return False, None
+
+    # 1. Official SlackApiError
+    if isinstance(exc, SlackApiError):
+        response = getattr(exc, "response", None)
+        status_code = getattr(response, "status_code", None) if response else None
+        headers = getattr(response, "headers", {}) if response else {}
+        error_code = ""
+        if response and hasattr(response, "get"):
+            error_code = str(response.get("error") or "")
+        elif response and hasattr(response, "data") and isinstance(response.data, dict):
+            error_code = str(response.data.get("error") or "")
+
+        # HTTP 429 Rate limiting
+        if status_code == 429 or error_code == "ratelimited":
+            retry_after = None
+            raw_retry = headers.get("Retry-After") or headers.get("retry-after")
+            if raw_retry:
+                try:
+                    retry_after = int(raw_retry)
+                except (ValueError, TypeError):
+                    retry_after = None
+            return True, retry_after
+
+        # HTTP 5xx Server errors
+        if status_code and status_code >= 500:
+            return True, None
+
+        if error_code in {"service_unavailable", "request_timeout", "internal_error", "fatal_error"}:
+            return True, None
+
+        # Definite permanent Slack API error codes
+        permanent_codes = {
+            "invalid_auth", "not_authed", "account_inactive", "token_revoked", "invalid_token",
+            "channel_not_found", "is_archived", "not_in_channel", "missing_scope",
+            "invalid_blocks", "invalid_json", "msg_too_long", "user_not_found", "no_text"
+        }
+        if error_code in permanent_codes or (status_code and 400 <= status_code < 500 and status_code != 429):
+            return False, None
+
+    # 2. String & Exception Type Inspection
+    err_str = str(exc).lower()
+    exc_type = type(exc).__name__.lower()
+
+    # Transient indicators
+    transient_keywords = [
+        "timeout", "timed out", "connect", "connectionerror", "connectionreset",
+        "connectionrefused", "name resolution", "temporary failure", "dns",
+        "500", "502", "503", "504", "server error", "rate limit", "429", "ratelimited"
+    ]
+    if any(kw in err_str or kw in exc_type for kw in transient_keywords):
+        match = re.search(r'retry-after[:\s=]+(\d+)', err_str)
+        retry_after = int(match.group(1)) if match else None
+        return True, retry_after
+
+    # Permanent indicators
+    permanent_keywords = [
+        "invalid_auth", "invalid token", "missing_scope", "channel_not_found",
+        "is_archived", "not_in_channel", "invalid_blocks", "401", "403", "404"
+    ]
+    if any(kw in err_str for kw in permanent_keywords):
+        return False, None
+
+    # Socket / Connection fallback
+    import socket
+    if isinstance(exc, (socket.timeout, socket.error, TimeoutError, ConnectionError)):
+        return True, None
+
+    return False, None
+
+
 def send_incident_notification(
     payload: Dict[str, Any],
     channel_override: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Dispatches Slack notification via official Slack SDK (slack_sdk.WebClient).
-    If SLACK_ENABLED=false or credentials unconfigured, safely logs and simulates successful delivery.
-    Treats Slack as an external dependency: returns status='FAILED' upon network/API failure without crashing.
+    Treats Slack strictly as an external dependency.
+    Returns structured delivery metadata:
+    - status: "DELIVERED" (or "SENT") on success, "FAILED" on failure
+    - is_transient: bool indicating whether failure is temporary
+    - retry_after: int | None respecting Slack rate limiting
+    - ts: message timestamp for deduplication
+    - duration_sec: latency measurement
     """
     target_channel = channel_override or payload.get("channel") or settings.SLACK_CHANNEL_ID or settings.SLACK_CHANNEL
+    start_time = time.perf_counter()
 
-    # 1. Disabled / Test Simulation Mode
+    # 1. Disabled Mode
     if not settings.SLACK_ENABLED:
         logger.info(f"[Mock Slack Notifier] SLACK_ENABLED is false. Simulated notification to {target_channel}")
-        return {"status": "SENT", "simulated": True, "error": None, "channel": target_channel, "ts": None}
+        return {
+            "status": "SENT",
+            "simulated": True,
+            "error": None,
+            "channel": target_channel,
+            "ts": None,
+            "is_transient": False,
+            "retry_after": None,
+            "duration_sec": 0.001
+        }
 
-    # 2. Check if Bot Token is provided
+    # 2. Check if Bot Token is provided / placeholder
     bot_token = settings.SLACK_BOT_TOKEN
     if not bot_token or "xoxb-your-bot" in bot_token or "PLACEHOLDER" in bot_token:
         logger.info(f"[Mock Slack Notifier] No valid SLACK_BOT_TOKEN provided. Simulated delivery to {target_channel}")
-        return {"status": "SENT", "simulated": True, "error": None, "channel": target_channel, "ts": None}
+        return {
+            "status": "SENT",
+            "simulated": True,
+            "error": None,
+            "channel": target_channel,
+            "ts": None,
+            "is_transient": False,
+            "retry_after": None,
+            "duration_sec": 0.001
+        }
 
-    # 3. Real Slack Web API Dispatch via slack_sdk
+    # 3. Real Slack Web API Dispatch with configurable timeout
+    timeout_sec = getattr(settings, "SLACK_NOTIFICATION_TIMEOUT_SECONDS", 10)
     try:
-        client = WebClient(token=bot_token)
+        client = WebClient(token=bot_token, timeout=timeout_sec)
         blocks = payload.get("blocks")
         text = payload.get("text", "Alert Fatigue Buster Incident Notification")
 
@@ -254,32 +357,52 @@ def send_incident_notification(
             text=text,
             blocks=blocks
         )
-        logger.info(f"Successfully posted Slack message to {target_channel} (ts={response.get('ts')})")
+        duration = time.perf_counter() - start_time
+        ts = response.get("ts")
+        logger.info(f"Successfully posted Slack message to {target_channel} (ts={ts}) in {duration:.3f}s")
         return {
-            "status": "SENT",
+            "status": "DELIVERED",
             "simulated": False,
             "error": None,
             "channel": target_channel,
-            "ts": response.get("ts")
+            "ts": ts,
+            "is_transient": False,
+            "retry_after": None,
+            "duration_sec": duration
         }
     except SlackApiError as exc:
-        err_msg = exc.response.get("error", str(exc))
-        logger.error(f"Slack API error delivering notification: {err_msg}")
+        duration = time.perf_counter() - start_time
+        is_transient, retry_after = classify_slack_error(exc)
+        err_msg = exc.response.get("error", str(exc)) if getattr(exc, "response", None) else str(exc)
+        logger.error(
+            f"Slack API error delivering notification (transient={is_transient}, retry_after={retry_after}): {err_msg}"
+        )
         return {
             "status": "FAILED",
             "simulated": False,
             "error": f"SlackApiError: {err_msg}",
             "channel": target_channel,
-            "ts": None
+            "ts": None,
+            "is_transient": is_transient,
+            "retry_after": retry_after,
+            "duration_sec": duration
         }
     except Exception as exc:
-        logger.error(f"Failed to deliver Slack notification: {exc}", exc_info=True)
+        duration = time.perf_counter() - start_time
+        is_transient, retry_after = classify_slack_error(exc)
+        logger.error(
+            f"Failed to deliver Slack notification (transient={is_transient}, retry_after={retry_after}): {exc}",
+            exc_info=False
+        )
         return {
             "status": "FAILED",
             "simulated": False,
             "error": str(exc),
             "channel": target_channel,
-            "ts": None
+            "ts": None,
+            "is_transient": is_transient,
+            "retry_after": retry_after,
+            "duration_sec": duration
         }
 
 
@@ -318,23 +441,39 @@ def verify_slack_signature(body: bytes, headers: Dict[str, str]) -> bool:
 def check_slack_health() -> Dict[str, Any]:
     """
     Evaluates Slack integration health without leaking bot tokens or signing secrets.
+    Distinguishes application health from Slack dependency status:
+    status: 'healthy' | 'degraded' | 'disabled'
     """
     configured = bool(settings.SLACK_BOT_TOKEN and "xoxb-your-bot" not in settings.SLACK_BOT_TOKEN)
     channel = settings.SLACK_CHANNEL_ID or settings.SLACK_CHANNEL
 
-    if not settings.SLACK_ENABLED or not configured:
+    if not settings.SLACK_ENABLED:
         return {
-            "enabled": settings.SLACK_ENABLED,
+            "status": "disabled",
+            "enabled": False,
             "configured": configured,
             "connected": False,
             "channel": channel,
             "bot_user": None
         }
 
+    if not configured:
+        return {
+            "status": "degraded",
+            "enabled": True,
+            "configured": False,
+            "connected": False,
+            "channel": channel,
+            "bot_user": None,
+            "error": "Slack bot token unconfigured"
+        }
+
     try:
-        client = WebClient(token=settings.SLACK_BOT_TOKEN)
+        timeout_sec = min(settings.SLACK_NOTIFICATION_TIMEOUT_SECONDS, 5)
+        client = WebClient(token=settings.SLACK_BOT_TOKEN, timeout=timeout_sec)
         auth_resp = client.auth_test()
         return {
+            "status": "healthy",
             "enabled": True,
             "configured": True,
             "connected": True,
@@ -345,6 +484,7 @@ def check_slack_health() -> Dict[str, Any]:
     except Exception as exc:
         logger.warning(f"Slack health connection test failed: {exc}")
         return {
+            "status": "degraded",
             "enabled": True,
             "configured": True,
             "connected": False,

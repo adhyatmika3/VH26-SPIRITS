@@ -257,9 +257,10 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
 
         notification_record = None
 
-        # 11. Handle Action based on Decision
+        # 11. Core Incident & Decision Persistence (Independent Transaction Boundary)
+        # We commit the incident, canonical alert, and decision record BEFORE dispatching notifications.
+        # This guarantees that external notification outages (Slack/Email) NEVER rollback or compromise core incident intelligence.
         if decision_outcome.decision == "ESCALATE":
-            # Record escalation with idempotency check
             record_incident_escalation(
                 db=db,
                 incident=incident,
@@ -268,59 +269,93 @@ def process_alert_pipeline(db: Session, payload: AlertWebhookPayload) -> Process
                 reason_codes=decision_outcome.reason_codes,
                 reason=decision_outcome.reason
             )
-            # Dispatch Escalation Notification: send email and Slack for CRITICAL incidents
+
+        db.commit()
+        db.refresh(raw_alert)
+        db.refresh(canonical_alert)
+        db.refresh(incident)
+        db.refresh(decision_record)
+
+        notification_record = None
+
+        # 12. Isolated Notification Layer (Email and Slack execute in independent failure domains)
+        if decision_outcome.decision == "ESCALATE":
             is_critical = (
                 canonical_alert.priority == "CRITICAL" or
                 incident.priority == "CRITICAL" or
                 risk_result.level == "CRITICAL"
             )
             if is_critical:
-                email_notif = dispatch_notification(
-                    db=db,
-                    decision_record=decision_record,
-                    incident=incident,
-                    canonical_alert=canonical_alert,
-                    notification_type="ESCALATION",
-                    channel="email"
-                )
-                slack_notif = dispatch_notification(
-                    db=db,
-                    decision_record=decision_record,
-                    incident=incident,
-                    canonical_alert=canonical_alert,
-                    notification_type="ESCALATION",
-                    channel="slack"
-                )
-                notification_record = email_notif or slack_notif
+                email_notif = None
+                slack_notif = None
+
+                # Email Escalation Attempt (Isolated)
+                try:
+                    email_notif = dispatch_notification(
+                        db=db,
+                        decision_record=decision_record,
+                        incident=incident,
+                        canonical_alert=canonical_alert,
+                        notification_type="ESCALATION",
+                        channel="email"
+                    )
+                    db.commit()
+                except Exception as e:
+                    logger.error(f"Isolated email escalation error for incident [{incident.incident_number}]: {e}", exc_info=True)
+                    db.rollback()
+
+                # Slack Escalation Attempt (Isolated - failure will NEVER affect email or incident)
+                try:
+                    slack_notif = dispatch_notification(
+                        db=db,
+                        decision_record=decision_record,
+                        incident=incident,
+                        canonical_alert=canonical_alert,
+                        notification_type="ESCALATION",
+                        channel="slack"
+                    )
+                    db.commit()
+                except Exception as e:
+                    logger.error(f"Isolated Slack escalation error for incident [{incident.incident_number}]: {e}", exc_info=True)
+                    db.rollback()
+
+                notification_record = slack_notif or email_notif
             else:
+                try:
+                    notification_record = dispatch_notification(
+                        db=db,
+                        decision_record=decision_record,
+                        incident=incident,
+                        canonical_alert=canonical_alert,
+                        notification_type="ESCALATION",
+                        channel="slack"
+                    )
+                    db.commit()
+                except Exception as e:
+                    logger.error(f"Isolated Slack escalation error for incident [{incident.incident_number}]: {e}", exc_info=True)
+                    db.rollback()
+
+        elif decision_outcome.decision == "NOTIFY":
+            notif_type = "RESOLUTION" if "INCIDENT_RESOLVED" in decision_outcome.reason_codes else "INITIAL"
+            try:
                 notification_record = dispatch_notification(
                     db=db,
                     decision_record=decision_record,
                     incident=incident,
                     canonical_alert=canonical_alert,
-                    notification_type="ESCALATION",
+                    notification_type=notif_type,
                     channel="slack"
                 )
+                db.commit()
+            except Exception as e:
+                logger.error(f"Isolated Slack notification error for incident [{incident.incident_number}]: {e}", exc_info=True)
+                db.rollback()
 
-        elif decision_outcome.decision == "NOTIFY":
-            notif_type = "RESOLUTION" if "INCIDENT_RESOLVED" in decision_outcome.reason_codes else "INITIAL"
-            notification_record = dispatch_notification(
-                db=db,
-                decision_record=decision_record,
-                incident=incident,
-                canonical_alert=canonical_alert,
-                notification_type=notif_type,
-                channel="slack"
-            )
-
-        # Commit entire atomic transaction
-        db.commit()
-        db.refresh(raw_alert)
-        db.refresh(canonical_alert)
-        db.refresh(incident)
-        db.refresh(decision_record)
         if notification_record:
-            db.refresh(notification_record)
+            try:
+                db.refresh(notification_record)
+            except Exception:
+                pass
 
         logger.info(
             f"Alert processed: Decision=[{decision_outcome.decision}], "

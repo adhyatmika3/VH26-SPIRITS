@@ -225,34 +225,50 @@ def record_resolution_metric(service: str) -> None:
     ALERT_RESOLUTIONS_TOTAL.labels(service=clean_svc).inc()
 
 
-# Slack-specific Observability Metrics
+# Slack-specific Observability Metrics (Phase 7 & 8)
 SLACK_NOTIFICATIONS_TOTAL = Counter(
     "slack_notifications_total",
     "Total count of Slack notification attempts",
-    ["status"]  # "sent", "failed", "duplicate", "skipped"
+    ["status"]  # "sent", "delivered", "failed", "retrying", "duplicate", "skipped"
 )
-SLACK_NOTIFICATIONS_SUCCESS_TOTAL = Counter(
-    "slack_notifications_success_total",
-    "Total count of successful Slack notifications"
+SLACK_NOTIFICATIONS_DELIVERED_TOTAL = Counter(
+    "slack_notifications_delivered_total",
+    "Total count of successfully delivered Slack notifications"
 )
+SLACK_NOTIFICATIONS_SUCCESS_TOTAL = SLACK_NOTIFICATIONS_DELIVERED_TOTAL  # Backwards compatibility alias
+
 SLACK_NOTIFICATIONS_FAILED_TOTAL = Counter(
     "slack_notifications_failed_total",
-    "Total count of failed Slack notifications"
+    "Total count of permanently failed Slack notifications",
+    ["error_type"]
 )
-SLACK_NOTIFICATION_LATENCY_SECONDS = Histogram(
-    "slack_notification_latency_seconds",
+SLACK_NOTIFICATIONS_RETRY_TOTAL = Counter(
+    "slack_notifications_retry_total",
+    "Total count of retry attempts triggered for transient Slack notifications"
+)
+SLACK_NOTIFICATION_DELIVERY_LATENCY = Histogram(
+    "slack_notification_delivery_latency",
     "Latency of Slack notification delivery in seconds",
-    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0)
+)
+SLACK_NOTIFICATION_LATENCY_SECONDS = SLACK_NOTIFICATION_DELIVERY_LATENCY  # Backwards compatibility alias
+
+SLACK_NOTIFICATION_PENDING = Gauge(
+    "slack_notification_pending",
+    "Current count of pending or retrying Slack notifications in database"
 )
 
 
-def record_slack_metric(status: str, duration_sec: Optional[float] = None) -> None:
+def record_slack_metric(status: str, duration_sec: Optional[float] = None, error_type: str = "unknown") -> None:
     st = status.lower()
     SLACK_NOTIFICATIONS_TOTAL.labels(status=st).inc()
-    if st == "sent":
-        SLACK_NOTIFICATIONS_SUCCESS_TOTAL.inc()
+    if st in ("sent", "delivered"):
+        SLACK_NOTIFICATIONS_DELIVERED_TOTAL.inc()
     elif st == "failed":
-        SLACK_NOTIFICATIONS_FAILED_TOTAL.inc()
+        SLACK_NOTIFICATIONS_FAILED_TOTAL.labels(error_type=error_type).inc()
+    elif st == "retrying":
+        SLACK_NOTIFICATIONS_RETRY_TOTAL.inc()
+
     if duration_sec is not None:
-        SLACK_NOTIFICATION_LATENCY_SECONDS.observe(duration_sec)
+        SLACK_NOTIFICATION_DELIVERY_LATENCY.observe(duration_sec)
 

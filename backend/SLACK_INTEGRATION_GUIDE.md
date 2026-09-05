@@ -156,7 +156,178 @@ curl -X POST http://localhost:8000/api/v1/alerts/simulate \
 ## Observability & Prometheus Metrics
 
 The Slackbot integration automatically exposes Prometheus metrics at `/metrics`:
-- `slack_notifications_total{status="sent|failed|skipped"}`
-- `slack_notifications_success_total`
-- `slack_notifications_failed_total`
-- `slack_notification_latency_seconds`
+- `slack_notifications_total{status="sent|delivered|failed|retrying|duplicate|skipped"}`
+- `slack_notifications_delivered_total`
+- `slack_notifications_failed_total{error_type="..."}`
+- `slack_notifications_retry_total`
+- `slack_notification_delivery_latency` (Histogram buckets)
+- `slack_notification_pending` (Gauge of current pending/retrying records)
+
+---
+
+# Phase 7 — Slack Failure Fallback & Notification Resilience
+
+## 1. Resilience Architecture
+
+> 💡 **Core Principle**: Slack is strictly a notification and operator collaboration tool. The core alert intelligence pipeline (raw ingestion, deduplication, correlation, incident creation, risk scoring, Decision Engine evaluation, and email escalation) **NEVER** depends on Slack availability.
+
+```text
+Alert Ingestion
+      ↓
+Deduplication & Correlation
+      ↓
+Incident Created
+      ↓
+Risk Scoring & Decision Engine
+      ↓
+┌────────────────────────────────────────────────────────┐
+│ Core Incident & Decision COMMITTED to PostgreSQL       │
+│ (100% durable independent transaction boundary)        │
+└────────────────────────────────────────────────────────┘
+                           ↓
+                   Notification Layer
+             ┌─────────────┴─────────────┐
+             ↓                           ↓
+      Email Escalation          Slackbot Notification
+   (Delivered / Failed)                  ↓
+                                 Slack Available?
+                                    ↙        ↘
+                                  YES         NO
+                                   ↓           ↓
+                               Delivered   Persistent NotificationRecord
+                                              (status: RETRYING)
+                                               + next_retry_at
+                                               + last_error
+                                                   ↓
+                                           Recovery Worker
+                                        (Exponential Backoff)
+```
+
+If Slack is completely down:
+- `Incident Status`: **CREATED & DURABLE** (in database)
+- `Email Escalation`: **DELIVERED** (isolated independent channel)
+- `Slack Notification`: **RETRYING** (or **FAILED** if permanent)
+- `GET /health`: **HTTP 200 OK** (`application: healthy`, `slack: degraded`)
+
+---
+
+## 2. Notification Delivery Lifecycle & Schema
+
+Notification delivery states are tracked in PostgreSQL (`notification_records` table):
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `incident_id` | UUID | Associated Core Incident |
+| `channel` | VARCHAR | `slack` or `email` |
+| `status` | VARCHAR | `PENDING`, `SENDING`, `SENT` (delivered), `RETRYING`, `FAILED` |
+| `attempt_count` | INTEGER | Number of delivery attempts |
+| `created_at` | TIMESTAMPTZ | Creation timestamp |
+| `last_attempt_at` | TIMESTAMPTZ | Most recent dispatch attempt timestamp |
+| `next_retry_at` | TIMESTAMPTZ | Scheduled next retry timestamp (indexed) |
+| `delivered_at` | TIMESTAMPTZ | Timestamp when message was confirmed by Slack API |
+| `slack_message_ts` | VARCHAR | Slack message timestamp (`ts`) for duplicate protection |
+| `is_transient` | BOOLEAN | True for transient network/rate-limit errors |
+| `last_error` | VARCHAR | Redacted diagnostic error message |
+
+---
+
+## 3. Transient vs Permanent Error Classification
+
+| Category | Examples | System Action | Next Status |
+|---|---|---|---|
+| **Transient** | Socket timeout, Connection reset, DNS error, HTTP 500/502/503/504, Slack API `ratelimited` (HTTP 429), `service_unavailable`, `internal_error` | Schedule exponential backoff; respect Slack `Retry-After` header | `RETRYING` |
+| **Permanent** | Invalid bot token (`invalid_auth`), channel not found (`channel_not_found`), bot not in channel (`not_in_channel`), missing permissions (`missing_scope`), bad payload (`invalid_blocks`), HTTP 400/401/403/404 | Abort retries immediately; log safely | `FAILED` |
+
+---
+
+## 4. Exponential Backoff & Retry Strategy
+
+Configurable via environment variables:
+```env
+SLACK_MAX_RETRIES=5
+SLACK_RETRY_BASE_SECONDS=5
+SLACK_NOTIFICATION_TIMEOUT_SECONDS=10
+```
+
+Backoff schedule (base = 5s):
+- **Attempt 1**: 5s delay
+- **Attempt 2**: 15s delay
+- **Attempt 3**: 45s delay
+- **Attempt 4**: 120s delay
+- **Attempt 5+**: Capped at 300s (5 minutes)
+- **HTTP 429**: Directly respects Slack's `Retry-After` response header
+
+---
+
+## 5. Recovery Worker & Endpoints
+
+When Slack recovers, queued notifications can be processed via API or background job:
+
+### Trigger Retry Worker
+```bash
+curl -X POST http://localhost:8000/api/v1/integrations/slack/retry?limit=50
+```
+Response:
+```json
+{
+  "status": "ok",
+  "result": {
+    "processed": 1,
+    "delivered": 1,
+    "failed": 0,
+    "retrying": 0,
+    "skipped_duplicate": 0,
+    "remaining_pending": 0
+  }
+}
+```
+
+### Inspect Pending/Retrying Notifications
+```bash
+curl http://localhost:8000/api/v1/integrations/slack/pending
+```
+
+---
+
+## 6. Health Check Behavior
+
+The root `/health` endpoint distinguishes application health from external dependency health:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Healthy Slack:
+```json
+{
+  "status": "healthy",
+  "database": "healthy",
+  "slack": "healthy"
+}
+```
+
+Slack Degraded / Down:
+```json
+{
+  "status": "healthy",
+  "database": "healthy",
+  "slack": "degraded"
+}
+```
+
+> ⚠️ **Key Guarantee**: The HTTP response code remains `200 OK` and core application status is `healthy` even if Slack is completely unreachable.
+
+---
+
+## 7. How to Simulate Slack Failure Locally
+
+Run the automated 3-scenario end-to-end demonstration:
+```bash
+python scripts/demo_slack_resilience_scenarios.py
+```
+
+This verifies:
+1. **Scenario A (Slack Healthy)**: 500 alerts -> 1 Incident -> CRITICAL -> Email delivered + Slack delivered.
+2. **Scenario B (Slack Down)**: 500 alerts with Slack unreachable -> Incident 100% PRESERVED, Email delivered, Slack queued in RETRYING state.
+3. **Scenario C (Slack Recovered)**: Slack restored -> Retry worker executes -> Slack notification DELIVERED with Slack message `ts` recorded.

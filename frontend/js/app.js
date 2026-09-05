@@ -412,6 +412,28 @@
           slackValChannel.innerText = isChannelConfigured ? chanDisplay : 'None';
           slackIndChannel.className = `w-2 h-2 rounded-full ${isChannelConfigured ? 'bg-emerald-500' : 'bg-slate-400'}`;
         }
+
+        let pendingCount = 0;
+        let pendingNotifications = [];
+        // Phase 7: Fetch Pending Retries count & items
+        try {
+          const pendingRes = await fetch('http://localhost:8000/api/v1/integrations/slack/pending').catch(() => null);
+          if (pendingRes && pendingRes.ok) {
+            const pendingData = await pendingRes.json();
+            pendingCount = pendingData.count || 0;
+            pendingNotifications = pendingData.notifications || [];
+            const valPending = document.getElementById('slack-val-pending');
+            const indPending = document.getElementById('slack-ind-pending');
+            if (valPending && indPending) {
+              valPending.innerText = pendingCount;
+              indPending.className = `w-2 h-2 rounded-full ${pendingCount === 0 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`;
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch pending Slack retries', err);
+        }
+
+        updateSlackOperationalBanner(isEnabled, isConnected, pendingCount, pendingNotifications, chanDisplay);
       } else {
         if (slackDot && slackText) {
           slackDot.className = 'w-2 h-2 rounded-full bg-slate-400';
@@ -421,6 +443,7 @@
           slackBadge.className = 'px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
           slackBadge.innerText = 'OFFLINE';
         }
+        updateSlackOperationalBanner(false, false, 0, [], 'None');
       }
     } catch (e) {
       if (dot && text) {
@@ -430,6 +453,211 @@
     }
   }
   window.checkSystemHealth = checkSystemHealth;
+
+  // Dynamic Banner Manager for Slack Presence vs Absence
+  function updateSlackOperationalBanner(isEnabled, isConnected, pendingCount = 0, notifications = [], chanDisplay = '#alert-buster') {
+    const banner = document.getElementById('slack-dynamic-state-callout');
+    const icon = document.getElementById('slack-dynamic-state-icon');
+    const badge = document.getElementById('slack-dynamic-state-badge');
+    const headline = document.getElementById('slack-dynamic-state-headline');
+    const desc = document.getElementById('slack-dynamic-state-desc');
+    const stats = document.getElementById('slack-dynamic-state-stats');
+    const pendingContainer = document.getElementById('slack-pending-container');
+    const pendingTableBody = document.getElementById('slack-pending-table-body');
+    const pendingTableCount = document.getElementById('slack-pending-table-count');
+
+    if (!banner) return;
+
+    const isSimulatedOutage = !!window._simulatedSlackOutage;
+    const effectiveConnected = isSimulatedOutage ? false : isConnected;
+
+    if (isSimulatedOutage || (!effectiveConnected && isEnabled)) {
+      // SCENARIO 2: SLACK NOT PRESENT / OUTAGE STATE
+      banner.className = 'p-3.5 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm ring-1 ring-amber-200 transition-all';
+      if (icon) {
+        icon.className = 'material-symbols-outlined text-[22px] text-amber-600 shrink-0 mt-0.5 animate-pulse';
+        icon.innerText = 'warning';
+      }
+      if (badge) {
+        badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-950';
+        badge.innerText = isSimulatedOutage ? 'SIMULATED OUTAGE: SLACK NOT PRESENT' : 'FALLBACK ACTIVE: SLACK NOT PRESENT';
+      }
+      if (headline) {
+        headline.innerText = 'Slack Unavailable — Incident Integrity Protected';
+      }
+      if (desc) {
+        desc.innerHTML = '<span class="font-bold text-amber-900">Alerts are PENDING</span> (not reached Slack yet). <span class="bg-amber-200/80 dark:bg-amber-900/60 text-amber-950 dark:text-amber-100 font-bold px-1.5 py-0.5 rounded border border-amber-300">INCIDENT IS NOT ELIMINATED!</span> Core Incident remains 100% saved in PostgreSQL, visible in SRE triage, and Email escalation was sent. Once Slack reconnects, retries automatically flush without alert duplication.';
+      }
+      if (stats) {
+        stats.className = 'shrink-0 font-code-sm text-[11px] text-amber-800 dark:text-amber-300 bg-white/80 dark:bg-black/40 px-3 py-1.5 rounded-lg border border-amber-300 font-bold';
+        stats.innerText = isSimulatedOutage ? 'Demo Outage Active • Incidents Safe' : `${pendingCount} Alert(s) Pending • 100% Safe`;
+      }
+    } else if (isEnabled && effectiveConnected && pendingCount > 0) {
+      // RECOVERY STATE
+      banner.className = 'p-3.5 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm transition-all';
+      if (icon) {
+        icon.className = 'material-symbols-outlined text-[22px] text-amber-600 shrink-0 mt-0.5';
+        icon.innerText = 'sync';
+      }
+      if (badge) {
+        badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-950';
+        badge.innerText = 'SLACK RECONNECTED: FLUSHING RETRIES';
+      }
+      if (headline) {
+        headline.innerText = 'Slack Connected — Delivering Buffered Alerts';
+      }
+      if (desc) {
+        desc.innerHTML = `<strong>${pendingCount} alert(s) currently pending</strong> in retry buffer. Incidents were kept 100% safe in PostgreSQL during outage and are now being delivered.`;
+      }
+      if (stats) {
+        stats.className = 'shrink-0 font-code-sm text-[11px] text-amber-800 dark:text-amber-300 bg-white/80 dark:bg-black/40 px-3 py-1.5 rounded-lg border border-amber-300 font-bold';
+        stats.innerText = `${pendingCount} Retries Pending`;
+      }
+    } else if (isEnabled && effectiveConnected) {
+      // SCENARIO 1: SLACK PRESENT & HEALTHY
+      banner.className = 'p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm transition-all';
+      if (icon) {
+        icon.className = 'material-symbols-outlined text-[20px] text-emerald-600 shrink-0 mt-0.5';
+        icon.innerText = 'verified_user';
+      }
+      if (badge) {
+        badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-200 text-emerald-900';
+        badge.innerText = 'REAL-TIME DISPATCH ACTIVE';
+      }
+      if (headline) {
+        headline.innerText = `Slack Channel ${chanDisplay} Connected`;
+      }
+      if (desc) {
+        desc.innerHTML = 'Critical incidents deliver immediately to Slack with Block Kit triage buttons. <strong>If Slack is ever not present:</strong> alerts become PENDING and <strong>the incident is NOT eliminated</strong>.';
+      }
+      if (stats) {
+        stats.className = 'shrink-0 font-code-sm text-[11px] text-emerald-700 dark:text-emerald-300 bg-white/60 dark:bg-black/20 px-3 py-1.5 rounded-lg border border-emerald-200/60';
+        stats.innerText = 'Zero Incident Loss Guaranteed';
+      }
+    } else {
+      // DISABLED
+      banner.className = 'p-3.5 rounded-xl border border-slate-200 bg-slate-50 dark:bg-slate-900/30 text-slate-800 dark:text-slate-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm transition-all';
+      if (icon) {
+        icon.className = 'material-symbols-outlined text-[20px] text-slate-500 shrink-0 mt-0.5';
+        icon.innerText = 'info';
+      }
+      if (badge) {
+        badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-800';
+        badge.innerText = 'SLACK DISABLED';
+      }
+      if (headline) {
+        headline.innerText = 'Local Development Mode';
+      }
+      if (desc) {
+        desc.innerHTML = 'Slack is disabled. Alerts process normally into PostgreSQL and Email escalation proceeds without any incident loss.';
+      }
+      if (stats) {
+        stats.className = 'shrink-0 font-code-sm text-[11px] text-slate-600 dark:text-slate-400 bg-white/60 dark:bg-black/20 px-3 py-1.5 rounded-lg border border-slate-200';
+        stats.innerText = 'Core Engine Active';
+      }
+    }
+
+    // Render pending table if pending > 0 or if simulated outage
+    if (pendingContainer && pendingTableBody) {
+      if (isSimulatedOutage || (notifications && notifications.length > 0)) {
+        pendingContainer.classList.remove('hidden');
+        const displayList = (notifications && notifications.length > 0) ? notifications : [
+          {
+            incident_id: 'INC-1004 (Demo)',
+            channel: 'slack',
+            status: 'PENDING',
+            attempt_count: 1,
+            next_retry_at: new Date(Date.now() + 15000).toISOString()
+          }
+        ];
+        if (pendingTableCount) pendingTableCount.innerText = displayList.length;
+        pendingTableBody.innerHTML = displayList.map(n => `
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="p-2 font-bold text-on-surface flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px] text-amber-500">crisis_alert</span>
+              <span>${n.incident_id || 'INC-LIVE'}</span>
+            </td>
+            <td class="p-2 text-secondary">#alert-buster</td>
+            <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">PENDING (Not Reached Slack)</span></td>
+            <td class="p-2 text-secondary">${n.attempt_count || 1} / 5</td>
+            <td class="p-2 text-emerald-600 font-bold flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px]">check_circle</span>
+              <span>100% Safe in PostgreSQL (NOT Eliminated)</span>
+            </td>
+            <td class="p-2 text-secondary">${n.next_retry_at ? new Date(n.next_retry_at).toLocaleTimeString() : 'Queued (15s backoff)'}</td>
+          </tr>
+        `).join('');
+      } else {
+        pendingContainer.classList.add('hidden');
+      }
+    }
+  }
+  window.updateSlackOperationalBanner = updateSlackOperationalBanner;
+
+  // Toggle Simulated Outage to demonstrate UI when Slack is NOT present
+  function toggleSimulatedSlackOutage() {
+    window._simulatedSlackOutage = !window._simulatedSlackOutage;
+    const btn = document.getElementById('btn-toggle-outage');
+    const btnText = document.getElementById('btn-toggle-outage-text');
+    const slackDot = document.getElementById('slack-health-dot');
+    const slackText = document.getElementById('slack-health-text');
+    const slackBadge = document.getElementById('slack-status-badge');
+    const slackValConnected = document.getElementById('slack-val-connected');
+    const slackIndConnected = document.getElementById('slack-ind-connected');
+    const valPending = document.getElementById('slack-val-pending');
+    const indPending = document.getElementById('slack-ind-pending');
+
+    if (window._simulatedSlackOutage) {
+      if (btn) btn.className = 'px-2.5 py-1 rounded-lg border border-amber-400 bg-amber-100 text-amber-900 font-bold transition-colors text-[11px] flex items-center gap-1 ring-2 ring-amber-300';
+      if (btnText) btnText.innerText = 'Exit Outage View';
+      if (slackDot && slackText) {
+        slackDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+        slackText.innerText = 'Slack: Degraded (Outage)';
+      }
+      if (slackBadge) {
+        slackBadge.className = 'px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200';
+        slackBadge.innerText = 'OUTAGE (STANDBY)';
+      }
+      if (slackValConnected && slackIndConnected) {
+        slackValConnected.innerText = 'Unreachable (Outage)';
+        slackIndConnected.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      }
+      if (valPending && indPending) {
+        valPending.innerText = '1';
+        indPending.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      }
+
+      updateSlackOperationalBanner(true, false, 1, [{
+        incident_id: 'INC-1004 (Active Incident)',
+        channel: 'slack',
+        status: 'PENDING',
+        attempt_count: 1,
+        next_retry_at: new Date(Date.now() + 15000).toISOString()
+      }], '#alert-buster');
+    } else {
+      if (btn) btn.className = 'px-2.5 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low hover:bg-surface-container text-on-surface font-medium transition-colors text-[11px] flex items-center gap-1';
+      if (btnText) btnText.innerText = 'Simulate Outage';
+      checkSystemHealth();
+    }
+  }
+  window.toggleSimulatedSlackOutage = toggleSimulatedSlackOutage;
+
+  async function triggerSlackRetriesManually() {
+    try {
+      const res = await fetch('http://localhost:8000/api/v1/integrations/slack/retry', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        const r = data.result || {};
+        alert(`Slack Retry Worker Executed:\n• Processed: ${r.processed || 0}\n• Delivered: ${r.delivered || 0}\n• Failed: ${r.failed || 0}\n• Retrying: ${r.retrying || 0}\n• Remaining Pending: ${r.remaining_pending || 0}`);
+        checkSystemHealth();
+      } else {
+        alert('Failed to execute Slack retry worker.');
+      }
+    } catch (err) {
+      alert('Error connecting to backend retry endpoint: ' + err.message);
+    }
+  }
+  window.triggerSlackRetriesManually = triggerSlackRetriesManually;
 
   // Fetch all real data from backend endpoints and update active view
   async function fetchAllRealData(isManual = false) {

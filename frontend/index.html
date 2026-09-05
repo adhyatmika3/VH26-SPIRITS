@@ -413,38 +413,160 @@
         </div>
 
         <!-- ============================================================== -->
-        <!-- SLACK BOT INCIDENT INTEGRATION STATUS (PHASE 8)                 -->
+        <!-- SLACK BOT INCIDENT INTEGRATION & RESILIENCE ARCHITECTURE        -->
         <!-- ============================================================== -->
-        <div class="bg-surface-container-lowest p-4 rounded-2xl shadow-sm border border-surface-container-highest flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center text-purple-700 dark:text-purple-300 shrink-0">
-              <span class="material-symbols-outlined text-[22px]">forum</span>
-            </div>
-            <div>
-              <div class="flex items-center gap-2 mb-0.5">
-                <h3 class="font-headline-sm text-sm font-bold text-on-surface">Slack Bot Incident Integration</h3>
-                <span id="slack-status-badge" class="px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Checking...</span>
+        <div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-surface-container-highest flex flex-col gap-4">
+          <!-- Top Row: Title, Status, and Controls -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-surface-container-highest">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center text-purple-700 dark:text-purple-300 shrink-0">
+                <span class="material-symbols-outlined text-[22px]">forum</span>
               </div>
-              <p class="text-[11px] text-on-surface-variant font-body-sm">Automated Block Kit triage alerts, incident action buttons (Acknowledge / Resolve), and 1-to-1 idempotency.</p>
+              <div>
+                <div class="flex items-center gap-2 mb-0.5">
+                  <h3 class="font-headline-sm text-sm font-bold text-on-surface">Slack Bot Integration &amp; Failure Resilience</h3>
+                  <span id="slack-status-badge" class="px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Checking...</span>
+                  <span id="slack-mode-badge" class="px-2 py-0.5 rounded font-code-sm text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Dual Pipeline</span>
+                </div>
+                <p class="text-[11px] text-on-surface-variant font-body-sm">Automated Block Kit triage alerts with transactional decoupling: Slack failure never eliminates incidents.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 sm:gap-4 font-code-sm text-xs">
+              <div class="flex items-center gap-1.5">
+                <span id="slack-ind-enabled" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span class="text-secondary">Enabled: <span id="slack-val-enabled" class="font-semibold text-on-surface">--</span></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span id="slack-ind-connected" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span class="text-secondary">Connected: <span id="slack-val-connected" class="font-semibold text-on-surface">--</span></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span id="slack-ind-channel" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span class="text-secondary">Channel: <span id="slack-val-channel" class="font-semibold text-on-surface">--</span></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span id="slack-ind-resilience" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span class="text-secondary">Resilience: <span class="font-semibold text-emerald-600 dark:text-emerald-400">Fallback Active</span></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span id="slack-ind-pending" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span class="text-secondary">Retries Pending: <span id="slack-val-pending" class="font-semibold text-on-surface">0</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="toggleSimulatedSlackOutage()" id="btn-toggle-outage" class="px-2.5 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low hover:bg-surface-container text-on-surface font-medium transition-colors text-[11px] flex items-center gap-1" title="Test how UI behaves when Slack is NOT present">
+                  <span class="material-symbols-outlined text-[14px] text-purple-600">tune</span>
+                  <span id="btn-toggle-outage-text">Simulate Outage</span>
+                </button>
+                <button type="button" onclick="triggerSlackRetriesManually()" class="px-2.5 py-1 rounded-lg border border-surface-container-highest bg-surface-container-low hover:bg-surface-container text-on-surface font-medium transition-colors text-[11px] flex items-center gap-1" title="Trigger Slack retry worker now">
+                  <span class="material-symbols-outlined text-[14px] text-amber-600">replay</span>
+                  <span>Retry Worker</span>
+                </button>
+                <a href="http://localhost:8000/api/v1/integrations/slack/health" target="_blank" class="px-2.5 py-1 rounded-lg border border-surface-container-highest text-primary font-medium hover:bg-surface-container transition-colors text-[11px] flex items-center gap-1">
+                  <span>Health</span>
+                  <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+                </a>
+              </div>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-4 sm:gap-6 font-code-sm text-xs">
-            <div class="flex items-center gap-1.5">
-              <span id="slack-ind-enabled" class="w-2 h-2 rounded-full bg-slate-400"></span>
-              <span class="text-secondary">Enabled: <span id="slack-val-enabled" class="font-semibold text-on-surface">--</span></span>
+
+          <!-- Dynamic Operational State Callout Banner -->
+          <div id="slack-dynamic-state-callout" class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm transition-all">
+            <div class="flex items-start gap-2.5">
+              <span id="slack-dynamic-state-icon" class="material-symbols-outlined text-[20px] text-emerald-600 shrink-0 mt-0.5">verified_user</span>
+              <div>
+                <div class="flex items-center gap-2 font-semibold">
+                  <span id="slack-dynamic-state-badge" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-200 text-emerald-900">REAL-TIME DISPATCH</span>
+                  <span id="slack-dynamic-state-headline">Slack Operational &amp; Connected</span>
+                </div>
+                <p id="slack-dynamic-state-desc" class="mt-0.5 text-[11px] text-emerald-800 dark:text-emerald-300">
+                  Critical alerts deliver directly to Slack with action buttons. If Slack is unavailable, the fallback guarantees alerts are buffered and incidents are never eliminated.
+                </p>
+              </div>
             </div>
-            <div class="flex items-center gap-1.5">
-              <span id="slack-ind-connected" class="w-2 h-2 rounded-full bg-slate-400"></span>
-              <span class="text-secondary">Connected: <span id="slack-val-connected" class="font-semibold text-on-surface">--</span></span>
+            <div id="slack-dynamic-state-stats" class="shrink-0 font-code-sm text-[11px] text-emerald-700 dark:text-emerald-300 bg-white/60 dark:bg-black/20 px-3 py-1.5 rounded-lg border border-emerald-200/60">
+              Zero Incident Loss Guaranteed
             </div>
-            <div class="flex items-center gap-1.5">
-              <span id="slack-ind-channel" class="w-2 h-2 rounded-full bg-slate-400"></span>
-              <span class="text-secondary">Channel: <span id="slack-val-channel" class="font-semibold text-on-surface">--</span></span>
+          </div>
+
+          <!-- Text Breakdown: HOW WE WORK (WITH SLACK vs WITHOUT SLACK) -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <!-- Scenario 1: When Slack is Present -->
+            <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5 font-bold text-xs text-on-surface">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span>Scenario 1: When Slack is PRESENT</span>
+                </div>
+                <span class="px-2 py-0.5 rounded font-code-sm text-[10px] bg-emerald-100 text-emerald-800 font-semibold">Active Mode</span>
+              </div>
+              <ul class="text-[11px] text-on-surface-variant space-y-1.5 font-body-sm">
+                <li class="flex items-start gap-1.5">
+                  <span class="material-symbols-outlined text-[14px] text-emerald-600 mt-0.5 shrink-0">check_circle</span>
+                  <span><strong>Alert Delivery:</strong> Critical incidents dispatched instantly to <code class="font-code-sm text-[10px] bg-surface-container px-1 py-0.5 rounded">#alert-buster</code> channel.</span>
+                </li>
+                <li class="flex items-start gap-1.5">
+                  <span class="material-symbols-outlined text-[14px] text-emerald-600 mt-0.5 shrink-0">check_circle</span>
+                  <span><strong>Triage in Slack:</strong> Interactive Block Kit buttons (<code class="text-[10px]">Acknowledge</code> / <code class="text-[10px]">Resolve</code>) update PostgreSQL in real time.</span>
+                </li>
+                <li class="flex items-start gap-1.5">
+                  <span class="material-symbols-outlined text-[14px] text-emerald-600 mt-0.5 shrink-0">check_circle</span>
+                  <span><strong>Full Escalation:</strong> Parallel Email notification dispatched + SRE Dashboard updated simultaneously.</span>
+                </li>
+              </ul>
             </div>
-            <a href="http://localhost:8000/api/v1/integrations/slack/health" target="_blank" class="px-2.5 py-1 rounded-lg border border-surface-container-highest text-primary font-medium hover:bg-surface-container transition-colors text-[11px] flex items-center gap-1">
-              <span>Inspect Health</span>
-              <span class="material-symbols-outlined text-[12px]">open_in_new</span>
-            </a>
+
+            <!-- Scenario 2: When Slack is NOT Present / Outage (Key Requirement) -->
+            <div class="p-3.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/80 dark:border-amber-900/40 flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5 font-bold text-xs text-amber-900 dark:text-amber-200">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  <span>Scenario 2: When Slack is NOT PRESENT / Outage</span>
+                </div>
+                <span class="px-2 py-0.5 rounded font-code-sm text-[10px] bg-amber-100 text-amber-800 font-bold">Resilience Fallback</span>
+              </div>
+              <ul class="text-[11px] text-amber-950 dark:text-amber-200/90 space-y-1.5 font-body-sm">
+                <li class="flex items-start gap-1.5">
+                  <span class="material-symbols-outlined text-[14px] text-amber-600 mt-0.5 shrink-0">hourglass_top</span>
+                  <span><strong>Alerts are PENDING:</strong> Slack notifications are buffered as <code class="font-code-sm text-[10px] bg-amber-100 text-amber-900 px-1 py-0.5 rounded font-bold">PENDING</code> (not reached Slack yet). Exponential backoff retries safely in background.</span>
+                </li>
+                <li class="flex items-start gap-1.5">
+                  <span class="material-symbols-outlined text-[14px] text-emerald-600 mt-0.5 shrink-0">verified</span>
+                  <span><strong>INCIDENT IS NOT ELIMINATED:</strong> The Core Incident is <strong>100% saved in PostgreSQL</strong>, remains fully active in SRE Dashboard, and is NEVER rolled back or dropped.</span>
+                </li>
+                <li class="flex items-start gap-1.5">
+                  <span class="material-symbols-outlined text-[14px] text-blue-600 mt-0.5 shrink-0">mail</span>
+                  <span><strong>Email Escalation Succeeds:</strong> Email alert pipeline is strictly decoupled and sends immediately regardless of Slack downtime.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Pending Retries Detail Table (shows when pending > 0) -->
+          <div id="slack-pending-container" class="hidden pt-2 border-t border-surface-container-highest">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px]">pending_actions</span>
+                <span>Buffered Slack Notifications Waiting for Recovery (<span id="slack-pending-table-count">0</span>)</span>
+              </span>
+              <span class="text-[11px] text-secondary font-code-sm">Incidents intact in PostgreSQL</span>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-surface-container-highest">
+              <table class="w-full text-left font-code-sm text-xs">
+                <thead class="bg-surface-container text-on-surface-variant text-[11px]">
+                  <tr>
+                    <th class="p-2">Incident ID</th>
+                    <th class="p-2">Channel</th>
+                    <th class="p-2">Delivery Status</th>
+                    <th class="p-2">Attempts</th>
+                    <th class="p-2">Incident Safety</th>
+                    <th class="p-2">Next Retry</th>
+                  </tr>
+                </thead>
+                <tbody id="slack-pending-table-body" class="divide-y divide-surface-container-highest bg-surface-container-lowest">
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
