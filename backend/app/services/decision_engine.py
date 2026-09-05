@@ -150,8 +150,11 @@ def evaluate_alert_decision(
     # -------------------------------------------------------------------------
     # 5. Active Cooldown Window Check
     # -------------------------------------------------------------------------
-    seconds_since_notification = (now - last_notified).total_seconds()
-    is_cooldown_active = seconds_since_notification < settings.ALERT_COOLDOWN_SECONDS
+    is_cooldown_active = False
+    seconds_since_notification = 0.0
+    if last_notified is not None:
+        seconds_since_notification = (now - last_notified).total_seconds()
+        is_cooldown_active = seconds_since_notification < settings.ALERT_COOLDOWN_SECONDS
 
     if is_cooldown_active:
         reason_codes = ["COOLDOWN_ACTIVE"]

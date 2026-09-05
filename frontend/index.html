@@ -571,253 +571,277 @@
         </div>
 
         <!-- ============================================================== -->
-        <!-- ALERT SIMULATOR & 500 -> 1 NORMALIZATION ENGINE               -->
+        <!-- ALERT LOAD TEST & HIGH-VOLUME INGESTION ENGINE                -->
         <!-- ============================================================== -->
         <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-highest flex flex-col gap-5">
           
-          <!-- Card Header & Presets -->
+          <!-- Card Header, Presets & Status Badge -->
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-surface-container-highest pb-4">
             <div>
               <div class="flex items-center gap-2 mb-1">
-                <span class="material-symbols-outlined text-primary text-[22px]">bolt</span>
-                <h2 class="font-headline-sm text-lg font-bold text-on-surface">Alert Simulator & 500→1 Normalization</h2>
-                <span class="px-2 py-0.5 rounded font-code-sm text-[11px] bg-primary text-on-primary font-semibold">Live Injection Pipeline</span>
+                <span class="material-symbols-outlined text-primary text-[22px]">speed</span>
+                <h2 class="font-headline-sm text-lg font-bold text-on-surface">Alert Load Test & High-Volume Ingestion</h2>
+                <div id="load-status-badge" class="px-2.5 py-0.5 rounded-full font-code-sm text-[11px] font-bold bg-surface-container text-secondary flex items-center gap-1.5 border border-surface-container-highest">
+                  <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                  <span>IDLE</span>
+                </div>
               </div>
               <p class="font-body-sm text-xs text-on-surface-variant">
-                Inject real alert bursts through the live webhook endpoint. Observe PostgreSQL storing all raw alerts, deterministic fingerprinting, and automatic consolidation into 1 core incident.
+                Dispatches controlled alert bursts across concurrent worker dispatchers into the live webhook ingestion API. Features connection pool protection, bounded queue backpressure, real-time telemetry, and PostgreSQL deduplication.
               </p>
             </div>
 
             <!-- Demo Scenario Presets -->
             <div class="flex flex-wrap items-center gap-2">
               <span class="font-label-sm text-xs font-bold text-secondary uppercase">Presets:</span>
-              <button type="button" onclick="selectSimPreset('normal')" class="preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="normal">
-                10 Normal
+              <button type="button" onclick="selectLoadPreset('duplicate_storm')" class="load-preset-btn active-load-preset px-2.5 py-1 rounded-lg bg-primary-fixed text-on-primary-fixed border border-primary text-xs font-bold shadow-sm transition-colors" data-preset="duplicate_storm">
+                500 Duplicate Storm
               </button>
-              <button type="button" onclick="selectSimPreset('spike')" class="preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="spike">
-                100 Spike
+              <button type="button" onclick="selectLoadPreset('alert_spike')" class="load-preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="alert_spike">
+                500 Alert Spike
               </button>
-              <button type="button" onclick="selectSimPreset('major')" class="preset-btn active-preset px-2.5 py-1 rounded-lg bg-primary-fixed text-on-primary-fixed border border-primary text-xs font-bold shadow-sm transition-colors" data-preset="major">
-                500 Major (500→1)
+              <button type="button" onclick="selectLoadPreset('mixed_incident')" class="load-preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="mixed_incident">
+                500 Mixed Incident
               </button>
-              <button type="button" onclick="selectSimPreset('multiple')" class="preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="multiple">
-                300 CPU + 200 DB
+              <button type="button" onclick="selectLoadPreset('major_outage')" class="load-preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="major_outage">
+                500 Major Outage
               </button>
-              <button type="button" onclick="selectSimPreset('unknown')" class="preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="unknown">
-                New/Unknown Alert
+              <button type="button" onclick="selectLoadPreset('normal')" class="load-preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors" data-preset="normal">
+                100 Normal
               </button>
             </div>
           </div>
 
-          <!-- Simulator Form Controls Grid -->
-          <form id="alert-simulator-form" onsubmit="event.preventDefault(); startAlertSimulation();" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 items-end">
+          <!-- Load Test Form Controls -->
+          <form id="load-test-form" onsubmit="event.preventDefault(); startLoadTest();" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+            <!-- Alert Count -->
             <div>
-              <label for="sim-count" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Number of Alerts</label>
-              <input type="number" id="sim-count" value="500" min="1" max="1000" class="w-full px-3 py-2 text-xs font-code-sm font-bold bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary"/>
+              <div class="flex items-center justify-between mb-1">
+                <label for="load-count" class="font-label-sm text-[11px] font-bold text-secondary uppercase">Number of Alerts</label>
+                <div class="flex gap-1 text-[10px] font-code-sm">
+                  <button type="button" onclick="setCountValue(100)" class="px-1.5 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-secondary">100</button>
+                  <button type="button" onclick="setCountValue(500)" class="px-1.5 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-secondary font-bold">500</button>
+                  <button type="button" onclick="setCountValue(1000)" class="px-1.5 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-secondary">1000</button>
+                </div>
+              </div>
+              <input type="number" id="load-count" value="500" min="1" max="5000" class="w-full px-3 py-2 text-xs font-code-sm font-bold bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary"/>
             </div>
 
+            <!-- Send Rate -->
             <div>
-              <label for="sim-service" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Service</label>
-              <select id="sim-service" class="w-full px-3 py-2 text-xs font-code-sm bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary">
-                <option value="payment-api" selected>payment-api</option>
-                <option value="checkout-service">checkout-service</option>
-                <option value="order-api">order-api</option>
-                <option value="auth-service">auth-service</option>
-                <option value="inventory-api">inventory-api</option>
+              <div class="flex items-center justify-between mb-1">
+                <label for="load-rate" class="font-label-sm text-[11px] font-bold text-secondary uppercase">Send Rate (alerts/sec)</label>
+                <div class="flex gap-1 text-[10px] font-code-sm">
+                  <button type="button" onclick="setRateValue(10)" class="px-1.5 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-secondary">10</button>
+                  <button type="button" onclick="setRateValue(50)" class="px-1.5 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-secondary">50</button>
+                  <button type="button" onclick="setRateValue(100)" class="px-1.5 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-secondary font-bold">100</button>
+                  <button type="button" onclick="setRateValue(500)" class="px-1.5 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-secondary">500</button>
+                </div>
+              </div>
+              <input type="number" id="load-rate" value="100" min="1" max="1000" class="w-full px-3 py-2 text-xs font-code-sm font-bold bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary"/>
+            </div>
+
+            <!-- Scenario Selection -->
+            <div>
+              <label for="load-scenario" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Scenario</label>
+              <select id="load-scenario" class="w-full px-3 py-2 text-xs font-code-sm bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary">
+                <option value="duplicate_storm" selected>Duplicate Storm (500→1 Incident)</option>
+                <option value="alert_spike">Alert Spike (Multi-Severity Burst)</option>
+                <option value="mixed_incident">Mixed Incident (CPU + DB Contention)</option>
+                <option value="major_outage">Major Outage (Cascade Across 3 Services)</option>
+                <option value="normal">Normal Baseline Stream</option>
               </select>
             </div>
 
+            <!-- Concurrent Workers -->
             <div>
-              <label for="sim-alert-type" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Alert Type</label>
-              <select id="sim-alert-type" class="w-full px-3 py-2 text-xs font-code-sm bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary">
-                <option value="CPU_HIGH" selected>High CPU</option>
-                <option value="DATABASE_ERROR">Database Error</option>
-                <option value="MEMORY_HIGH">High Memory</option>
-                <option value="LATENCY_HIGH">High Latency</option>
-                <option value="PaymentGatewayResponseAnomaly">New / Unknown Alert (PaymentGatewayResponseAnomaly)</option>
+              <label for="load-concurrency" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Concurrent Workers</label>
+              <select id="load-concurrency" class="w-full px-3 py-2 text-xs font-code-sm bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary">
+                <option value="2">2 Workers</option>
+                <option value="4" selected>4 Workers (Balanced)</option>
+                <option value="8">8 Workers (High Throughput)</option>
+                <option value="12">12 Workers (Extreme Burst)</option>
               </select>
             </div>
 
-            <div>
-              <label for="sim-severity" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Severity</label>
-              <select id="sim-severity" class="w-full px-3 py-2 text-xs font-code-sm bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary">
-                <option value="critical" selected>Critical</option>
-                <option value="error">Error</option>
-                <option value="warning">Warning</option>
-                <option value="info">Info</option>
-              </select>
-            </div>
-
-            <div>
-              <label for="sim-environment" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Environment</label>
-              <select id="sim-environment" class="w-full px-3 py-2 text-xs font-code-sm bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary">
-                <option value="production" selected>production</option>
-                <option value="staging">staging</option>
-                <option value="development">development</option>
-              </select>
-            </div>
-
-            <div>
-              <label for="sim-delay" class="block font-label-sm text-[11px] font-bold text-secondary uppercase mb-1">Delay (ms)</label>
-              <input type="number" id="sim-delay" value="0" min="0" max="2000" step="10" class="w-full px-3 py-2 text-xs font-code-sm bg-surface-container-low border border-surface-container-highest rounded-xl text-on-surface focus:outline-none focus:border-primary"/>
-            </div>
-
-            <div>
-              <button type="submit" id="btn-generate-alerts" class="w-full flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-all shadow-md active:scale-95">
+            <!-- Control Actions -->
+            <div class="flex items-center gap-2">
+              <button type="submit" id="btn-start-load" class="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-all shadow-md active:scale-95">
                 <span class="material-symbols-outlined text-[16px]">play_arrow</span>
-                <span id="btn-generate-text">GENERATE ALERTS</span>
+                <span id="btn-start-load-text">START LOAD TEST</span>
+              </button>
+              <button type="button" id="btn-stop-load" onclick="stopLoadTest()" class="hidden px-3 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 font-label-md text-xs font-bold hover:bg-red-100 transition-all shadow-sm">
+                <span class="material-symbols-outlined text-[16px]">stop</span>
+              </button>
+              <button type="button" id="btn-reset-load" onclick="resetLoadTest()" title="Reset load test metrics" class="px-2.5 py-2 rounded-xl border border-surface-container-highest text-secondary hover:bg-surface-container text-xs font-medium transition-colors">
+                <span class="material-symbols-outlined text-[16px]">restart_alt</span>
               </button>
             </div>
           </form>
 
-          <!-- Live Progress & Variation Stream Ticker (hidden until generation) -->
-          <div id="sim-progress-panel" class="hidden flex flex-col gap-3 p-4 rounded-xl bg-surface-container-low border border-surface-container-highest">
-            <div class="flex items-center justify-between text-xs font-code-sm">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
-                <span id="sim-progress-status" class="font-bold text-on-surface">Sending alerts via webhook pipeline...</span>
-              </div>
-              <span id="sim-progress-count" class="font-bold text-primary">0 / 500</span>
+          <!-- Live Operational Metrics Dashboard (8 Compact Real-Data KPIs) -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Submitted</span>
+              <span id="metric-submitted" class="text-xl font-bold font-code-sm text-on-surface block mt-0.5">0</span>
+              <span class="text-[10px] text-secondary block truncate">Dispatched</span>
             </div>
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Accepted</span>
+              <span id="metric-accepted" class="text-xl font-bold font-code-sm text-emerald-600 block mt-0.5">0</span>
+              <span class="text-[10px] text-secondary block truncate">HTTP 201</span>
+            </div>
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Processed</span>
+              <span id="metric-processed" class="text-xl font-bold font-code-sm text-primary block mt-0.5">0</span>
+              <span class="text-[10px] text-secondary block truncate">Pipeline Complete</span>
+            </div>
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Failed</span>
+              <span id="metric-failed" class="text-xl font-bold font-code-sm text-slate-700 block mt-0.5">0</span>
+              <span class="text-[10px] text-secondary block truncate">Errors / 429</span>
+            </div>
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Process Rate</span>
+              <span id="metric-rate" class="text-xl font-bold font-code-sm text-on-surface block mt-0.5">0<span class="text-xs text-secondary font-normal">/s</span></span>
+              <span class="text-[10px] text-secondary block truncate">1s Rolling Rate</span>
+            </div>
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Backlog</span>
+              <span id="metric-backlog" class="text-xl font-bold font-code-sm text-amber-600 block mt-0.5">0</span>
+              <span class="text-[10px] text-secondary block truncate">In-Queue</span>
+            </div>
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Active Workers</span>
+              <span id="metric-workers" class="text-xl font-bold font-code-sm text-indigo-600 block mt-0.5">0</span>
+              <span class="text-[10px] text-secondary block truncate">Worker Tasks</span>
+            </div>
+            <div class="p-3 rounded-xl bg-surface-container-low border border-surface-container-highest">
+              <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block truncate">Avg Latency</span>
+              <span id="metric-latency" class="text-xl font-bold font-code-sm text-on-surface block mt-0.5">0<span class="text-xs text-secondary font-normal">ms</span></span>
+              <span class="text-[10px] text-secondary block truncate">Round-Trip</span>
+            </div>
+          </div>
+
+          <!-- Two Live Operational Charts (Real Backend Metrics) -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             
-            <!-- Progress Bar -->
-            <div class="w-full bg-surface-container h-2.5 rounded-full overflow-hidden border border-surface-container-highest">
-              <div id="sim-progress-bar" class="bg-primary h-full rounded-full transition-all duration-150" style="width: 0%"></div>
-            </div>
-
-            <!-- Realistic Variation Text Stream -->
-            <div class="flex items-center gap-2 text-[11px] font-code-sm text-secondary truncate">
-              <span class="material-symbols-outlined text-[14px] text-primary shrink-0">history_edu</span>
-              <span>Sample Variation:</span>
-              <span id="sim-variation-preview" class="font-semibold text-on-surface truncate">"CPU > 90% on payment-api"</span>
-            </div>
-          </div>
-
-          <!-- Stage Checklist (Shows pipeline verification stages) -->
-          <div id="sim-checklist-panel" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-surface-container-highest text-xs font-code-sm">
-            <div id="chk-received" class="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
-              <span class="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-              <span><strong id="chk-received-num">500</strong> alerts received</span>
-            </div>
-            <div id="chk-stored" class="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
-              <span class="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-              <span><strong id="chk-stored-num">500</strong> raw stored (audit)</span>
-            </div>
-            <div id="chk-created" class="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
-              <span class="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-              <span><strong id="chk-created-num">1</strong> core incident</span>
-            </div>
-            <div id="chk-grouped" class="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
-              <span class="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-              <span><strong id="chk-grouped-num">500</strong> alerts grouped</span>
-            </div>
-          </div>
-
-          <!-- ========================================================== -->
-          <!-- 7. NORMALIZATION RESULT SECTION                            -->
-          <!-- ========================================================== -->
-          <div id="sim-result-panel" class="hidden flex flex-col gap-4 pt-4 border-t-2 border-primary/20 bg-surface-container-lowest">
-            <div class="flex items-center justify-between">
-              <span class="font-label-sm text-xs font-bold text-primary uppercase tracking-wider">Normalization Result (Database Verified)</span>
-              <span class="font-code-sm text-xs text-secondary">Real PostgreSQL Rows · Zero Hardcoding</span>
-            </div>
-
-            <!-- Metric Triad: RAW ALERTS (500) | CORE INCIDENTS (1) | ALERT REDUCTION (99.8%) -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div class="p-4 rounded-xl bg-surface-container-low border border-surface-container-highest text-center">
-                <span class="font-label-sm text-[11px] font-bold text-secondary uppercase block">Raw Alerts</span>
-                <span id="res-raw-count" class="text-3xl font-bold font-code-sm text-on-surface">500</span>
-                <span class="text-[11px] text-secondary block mt-0.5">Persisted in PostgreSQL</span>
-              </div>
-              <div class="p-4 rounded-xl bg-surface-container-low border border-surface-container-highest text-center">
-                <span class="font-label-sm text-[11px] font-bold text-secondary uppercase block">Core Incidents</span>
-                <span id="res-incident-count" class="text-3xl font-bold font-code-sm text-primary">1</span>
-                <span class="text-[11px] text-secondary block mt-0.5">Underlying Problem Isolated</span>
-              </div>
-              <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
-                <span class="font-label-sm text-[11px] font-bold text-emerald-800 uppercase block">Alert Reduction</span>
-                <span id="res-reduction-pct" class="text-3xl font-bold font-code-sm text-emerald-600">99.8%</span>
-                <span class="text-[11px] text-emerald-700 block mt-0.5">Cognitive Fatigue Eliminated</span>
-              </div>
-            </div>
-
-            <!-- Core Incident Card (#INC-XXXX) -->
-            <div class="p-space-lg rounded-2xl bg-surface-container-lowest border-2 border-primary/30 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div class="space-y-1.5">
+            <!-- Chart 1: Incoming vs. Processed Throughput -->
+            <div class="p-4 rounded-xl bg-surface-container-low border border-surface-container-highest flex flex-col gap-2">
+              <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <span id="res-inc-number" class="font-code-sm text-xs font-bold px-2.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed">#INC-1001</span>
-                  <span id="res-inc-badge" class="font-code-sm text-xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-800">🔴 Critical</span>
-                  <span class="font-code-sm text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">Active</span>
+                  <span class="material-symbols-outlined text-[16px] text-primary">show_chart</span>
+                  <span class="font-label-sm text-xs font-bold text-on-surface uppercase">Incoming vs Processed Alerts (Rate / sec)</span>
                 </div>
-                <h3 id="res-inc-title" class="font-headline-sm text-lg font-bold text-on-surface">Payment API — High CPU Utilization</h3>
-                <div class="flex flex-wrap items-center gap-3 text-xs font-code-sm text-secondary">
-                  <span>Occurrences: <strong id="res-inc-occurrences" class="text-primary font-bold">500</strong></span>
-                  <span>·</span>
-                  <span>Service: <strong id="res-inc-service" class="text-on-surface">payment-api</strong></span>
-                  <span>·</span>
-                  <span>Environment: <strong id="res-inc-env" class="text-on-surface">production</strong></span>
-                  <span>·</span>
-                  <span class="truncate">Fingerprint: <strong id="res-inc-fp" class="text-on-surface font-mono text-[10px]">...</strong></span>
+                <div class="flex items-center gap-3 text-[10px] font-code-sm">
+                  <span class="flex items-center gap-1 text-secondary"><span class="w-2.5 h-0.5 bg-slate-400 inline-block"></span> Target Rate</span>
+                  <span class="flex items-center gap-1 text-primary font-bold"><span class="w-2.5 h-0.5 bg-primary inline-block"></span> Processed Rate</span>
                 </div>
+              </div>
+              <div class="h-32 w-full relative flex items-center justify-center border-t border-surface-container-highest pt-2">
+                <svg id="chart-rate-svg" class="w-full h-full overflow-visible" viewBox="0 0 400 100" preserveAspectRatio="none">
+                  <!-- Rendered dynamically from backend timeseries metrics -->
+                </svg>
+                <div id="chart-rate-empty" class="absolute inset-0 flex items-center justify-center text-xs text-secondary font-code-sm">
+                  No active load test. Select parameters and click Start Load Test.
+                </div>
+              </div>
+            </div>
+
+            <!-- Chart 2: Pipeline Latency Over Time -->
+            <div class="p-4 rounded-xl bg-surface-container-low border border-surface-container-highest flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[16px] text-emerald-600">timer</span>
+                  <span class="font-label-sm text-xs font-bold text-on-surface uppercase">Processing Latency Over Time (ms)</span>
+                </div>
+                <div class="flex items-center gap-2 text-[10px] font-code-sm text-emerald-700">
+                  <span class="w-2.5 h-0.5 bg-emerald-500 inline-block"></span> Round-Trip Latency
+                </div>
+              </div>
+              <div class="h-32 w-full relative flex items-center justify-center border-t border-surface-container-highest pt-2">
+                <svg id="chart-latency-svg" class="w-full h-full overflow-visible" viewBox="0 0 400 100" preserveAspectRatio="none">
+                  <!-- Rendered dynamically from backend timeseries metrics -->
+                </svg>
+                <div id="chart-latency-empty" class="absolute inset-0 flex items-center justify-center text-xs text-secondary font-code-sm">
+                  No active load test. Select parameters and click Start Load Test.
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ============================================================== -->
+          <!-- LOAD TEST RESULT & DOWNSTREAM POSTGRESQL VERIFICATION          -->
+          <!-- ============================================================== -->
+          <div id="load-result-panel" class="hidden flex flex-col gap-4 pt-4 border-t-2 border-primary/20 bg-surface-container-lowest">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span class="font-label-sm text-xs font-bold text-primary uppercase tracking-wider">Load Test Result (Database Verified)</span>
+                <p id="load-result-summary-text" class="text-xs font-code-sm text-on-surface font-semibold mt-0.5">
+                  500 alerts submitted · 500 accepted · 500 processed · 0 failed
+                </p>
+              </div>
+              <span id="load-result-performance-stats" class="text-xs font-code-sm text-secondary">
+                Peak rate: 0/s · Avg latency: 0ms · Peak backlog: 0 · Workers: 4
+              </span>
+            </div>
+
+            <!-- Downstream Verified Triad: RAW ALERTS | CORE INCIDENTS | NOISE REDUCTION -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest text-center">
+                <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block">Raw Alerts</span>
+                <span id="load-res-raw-count" class="text-2xl font-bold font-code-sm text-on-surface">500</span>
+                <span class="text-[10px] text-secondary block mt-0.5">Persisted in PostgreSQL</span>
+              </div>
+              <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest text-center">
+                <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block">Core Incidents</span>
+                <span id="load-res-incident-count" class="text-2xl font-bold font-code-sm text-primary">1</span>
+                <span class="text-[10px] text-secondary block mt-0.5">Isolated Root Cause</span>
+              </div>
+              <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                <span class="font-label-sm text-[10px] font-bold text-emerald-800 uppercase block">Alert Reduction</span>
+                <span id="load-res-reduction-pct" class="text-2xl font-bold font-code-sm text-emerald-600">99.8%</span>
+                <span class="text-[10px] text-emerald-700 block mt-0.5">Cognitive Fatigue Eliminated</span>
+              </div>
+              <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest text-center">
+                <span class="font-label-sm text-[10px] font-bold text-secondary uppercase block">Notifications</span>
+                <span id="load-res-notif-count" class="text-2xl font-bold font-code-sm text-on-surface">1</span>
+                <span class="text-[10px] text-secondary block mt-0.5">Dispatched / Buffered</span>
+              </div>
+            </div>
+
+            <!-- Primary Correlated Incident Card -->
+            <div class="p-space-base rounded-xl bg-surface-container-low border border-surface-container-highest flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span id="load-res-inc-number" class="font-code-sm text-xs font-bold px-2 py-0.5 rounded bg-primary text-white">#INC-1001</span>
+                  <span class="font-code-sm text-xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-800">Critical Priority</span>
+                  <span class="font-code-sm text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">Consolidated</span>
+                </div>
+                <h4 id="load-res-inc-title" class="font-headline-sm text-sm font-bold text-on-surface">Payment API — High CPU Utilization</h4>
+                <p class="text-[11px] font-code-sm text-secondary">
+                  500 burst alerts normalized into 1 core incident. All raw audit logs preserved for compliance.
+                </p>
               </div>
 
               <div class="flex items-center gap-2 shrink-0">
-                <button type="button" onclick="openRawAlertsModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-semibold border border-surface-container-highest transition-colors shadow-sm">
-                  <span class="material-symbols-outlined text-[16px] text-primary">visibility</span>
-                  <span>View Raw Alerts</span>
+                <button type="button" onclick="openRawAlertsModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-semibold border border-surface-container-highest transition-colors shadow-sm">
+                  <span class="material-symbols-outlined text-[15px] text-primary">visibility</span>
+                  <span>View Raw Audit Logs</span>
                 </button>
-                <button type="button" id="btn-open-incident-details" onclick="openSimulatedIncident()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-colors shadow-sm">
-                  <span class="material-symbols-outlined text-[16px]">psychology</span>
-                  <span>Investigate Incident</span>
+                <button type="button" onclick="openSimulatedIncident()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-colors shadow-sm">
+                  <span class="material-symbols-outlined text-[15px]">task_alt</span>
+                  <span>Acknowledge & Resolve</span>
                 </button>
-              </div>
-            </div>
-
-            <!-- AI Diagnostic & Remediation Intelligence Card (Live from AI Engine) -->
-            <div id="sim-ai-resolution-card" class="p-space-lg rounded-2xl bg-surface-container-lowest border-2 border-primary/40 shadow-sm flex flex-col gap-3">
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-surface-container-highest pb-3">
-                <div class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-primary text-[22px]">psychology</span>
-                  <div>
-                    <h4 class="font-headline-sm text-sm font-bold text-on-surface">Diagnostic & Remediation Intelligence (AI Engine)</h4>
-                    <span class="text-[11px] text-secondary">Automated root cause deduction & step-by-step SRE runbook synthesis</span>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 self-start sm:self-center">
-                  <span id="sim-ai-source-badge" class="px-2.5 py-1 rounded font-code-sm text-[11px] font-bold bg-primary-fixed text-on-primary-fixed">Automated Analysis (Gemini)</span>
-                  <span id="sim-ai-confidence-badge" class="px-2.5 py-1 rounded-full font-code-sm text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">94% Confidence</span>
-                </div>
-              </div>
-
-              <!-- Probable Root Cause -->
-              <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest space-y-1.5">
-                <div class="flex items-center gap-1.5 font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">
-                  <span class="material-symbols-outlined text-[16px] text-primary">search_insights</span>
-                  Probable Root Cause
-                </div>
-                <div id="sim-ai-root-cause" class="text-xs font-medium text-on-surface leading-relaxed">
-                  Analyzing alert telemetry...
-                </div>
-              </div>
-
-              <!-- Recommended Remediation Steps -->
-              <div class="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-highest space-y-2.5">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-1.5 font-label-sm text-[11px] font-bold text-secondary uppercase tracking-wider">
-                    <span class="material-symbols-outlined text-[16px] text-emerald-600">playlist_add_check</span>
-                    Recommended Remediation Steps
-                  </div>
-                  <span id="sim-ai-steps-count" class="font-code-sm text-[10px] text-secondary">5 ACTION STEPS</span>
-                </div>
-                <ul id="sim-ai-steps-list" class="space-y-2">
-                  <!-- Dynamically populated -->
-                </ul>
               </div>
             </div>
 
           </div>
 
         </div>
+
 
         <!-- Main Intelligence Grid: Recent Ingested Alerts & Active Correlated Incidents -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">

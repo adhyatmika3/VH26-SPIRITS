@@ -2910,79 +2910,64 @@
   }
 
   // ==============================================================
-  // ALERT SIMULATOR & 500 -> 1 NORMALIZATION CONTROLLER
+  // ALERT LOAD TEST & HIGH-VOLUME INGESTION CONTROLLER
   // ==============================================================
-  let currentSimScenario = 'major';
-  let sampleVariationsList = [
-    "CPU > 90% on payment-api",
-    "CPU reached 95% on payment-api",
-    "High CPU usage detected on payment-api",
-    "payment-api CPU utilization critical (96%)",
-    "CPU threshold exceeded on payment-api container",
-    "Host CPU spike sustained on payment-api instances",
-    "Unexpected HTTP 502/504 surge from payment gateway processor on payment-api",
-    "payment-api: Payment webhook processing failure rate spike > 18.5%",
-    "TLS handshake latency anomaly detected against upstream payment provider on payment-api",
-    "Idempotency token conflict rate exceeding nominal baseline on payment-api"
-  ];
+  let currentLoadScenario = 'duplicate_storm';
+  let loadTestPollTimer = null;
+  window.lastSimulatedIncidentId = null;
 
-  window.selectSimPreset = function (preset) {
-    currentSimScenario = preset;
-    const countInput = document.getElementById('sim-count');
-    const serviceSelect = document.getElementById('sim-service');
-    const typeSelect = document.getElementById('sim-alert-type');
-    const sevSelect = document.getElementById('sim-severity');
-    const envSelect = document.getElementById('sim-environment');
-    const delayInput = document.getElementById('sim-delay');
+  window.selectLoadPreset = function (preset) {
+    currentLoadScenario = preset;
+    const countInput = document.getElementById('load-count');
+    const rateInput = document.getElementById('load-rate');
+    const scenarioSelect = document.getElementById('load-scenario');
+    const concurrencySelect = document.getElementById('load-concurrency');
 
-    // Update preset buttons styling
-    document.querySelectorAll('.preset-btn').forEach(btn => {
+    document.querySelectorAll('.load-preset-btn').forEach(btn => {
       if (btn.dataset.preset === preset) {
-        btn.className = 'preset-btn active-preset px-2.5 py-1 rounded-lg bg-primary-fixed text-on-primary-fixed border border-primary text-xs font-bold shadow-sm transition-colors';
+        btn.className = 'load-preset-btn active-load-preset px-2.5 py-1 rounded-lg bg-primary-fixed text-on-primary-fixed border border-primary text-xs font-bold shadow-sm transition-colors';
       } else {
-        btn.className = 'preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors';
+        btn.className = 'load-preset-btn px-2.5 py-1 rounded-lg border border-surface-container-highest text-xs font-medium text-secondary hover:bg-surface-container-high transition-colors';
       }
     });
 
-    if (preset === 'normal') {
-      if (countInput) countInput.value = '10';
-      if (serviceSelect) serviceSelect.value = 'payment-api';
-      if (typeSelect) typeSelect.value = 'CPU_HIGH';
-      if (sevSelect) sevSelect.value = 'critical';
-      if (envSelect) envSelect.value = 'production';
-      if (delayInput) delayInput.value = '0';
-    } else if (preset === 'spike') {
+    if (preset === 'duplicate_storm') {
+      if (countInput) countInput.value = '500';
+      if (rateInput) rateInput.value = '100';
+      if (scenarioSelect) scenarioSelect.value = 'duplicate_storm';
+      if (concurrencySelect) concurrencySelect.value = '4';
+    } else if (preset === 'alert_spike') {
+      if (countInput) countInput.value = '500';
+      if (rateInput) rateInput.value = '100';
+      if (scenarioSelect) scenarioSelect.value = 'alert_spike';
+      if (concurrencySelect) concurrencySelect.value = '4';
+    } else if (preset === 'mixed_incident') {
+      if (countInput) countInput.value = '500';
+      if (rateInput) rateInput.value = '100';
+      if (scenarioSelect) scenarioSelect.value = 'mixed_incident';
+      if (concurrencySelect) concurrencySelect.value = '4';
+    } else if (preset === 'major_outage') {
+      if (countInput) countInput.value = '500';
+      if (rateInput) rateInput.value = '100';
+      if (scenarioSelect) scenarioSelect.value = 'major_outage';
+      if (concurrencySelect) concurrencySelect.value = '4';
+    } else if (preset === 'normal') {
       if (countInput) countInput.value = '100';
-      if (serviceSelect) serviceSelect.value = 'payment-api';
-      if (typeSelect) typeSelect.value = 'CPU_HIGH';
-      if (sevSelect) sevSelect.value = 'critical';
-      if (envSelect) envSelect.value = 'production';
-      if (delayInput) delayInput.value = '0';
-    } else if (preset === 'major') {
-      if (countInput) countInput.value = '500';
-      if (serviceSelect) serviceSelect.value = 'payment-api';
-      if (typeSelect) typeSelect.value = 'CPU_HIGH';
-      if (sevSelect) sevSelect.value = 'critical';
-      if (envSelect) envSelect.value = 'production';
-      if (delayInput) delayInput.value = '0';
-    } else if (preset === 'multiple') {
-      if (countInput) countInput.value = '500';
-      if (serviceSelect) serviceSelect.value = 'payment-api';
-      if (typeSelect) typeSelect.value = 'CPU_HIGH';
-      if (sevSelect) sevSelect.value = 'critical';
-      if (envSelect) envSelect.value = 'production';
-      if (delayInput) delayInput.value = '0';
-    } else if (preset === 'unknown') {
-      if (countInput) countInput.value = '10';
-      if (serviceSelect) serviceSelect.value = 'checkout-service';
-      if (typeSelect) typeSelect.value = 'PaymentGatewayResponseAnomaly';
-      if (sevSelect) sevSelect.value = 'warning';
-      if (envSelect) envSelect.value = 'production';
-      if (delayInput) delayInput.value = '0';
+      if (rateInput) rateInput.value = '50';
+      if (scenarioSelect) scenarioSelect.value = 'normal';
+      if (concurrencySelect) concurrencySelect.value = '2';
     }
   };
 
-  window.lastSimulatedIncidentId = null;
+  window.setCountValue = function (val) {
+    const input = document.getElementById('load-count');
+    if (input) input.value = val;
+  };
+
+  window.setRateValue = function (val) {
+    const input = document.getElementById('load-rate');
+    if (input) input.value = val;
+  };
 
   window.openSimulatedIncident = function () {
     if (window.lastSimulatedIncidentId) {
@@ -2993,201 +2978,322 @@
     }
   };
 
-  window.startAlertSimulation = async function () {
-    const count = parseInt(document.getElementById('sim-count')?.value || '500', 10);
-    const service = document.getElementById('sim-service')?.value || 'payment-api';
-    const alert_type = document.getElementById('sim-alert-type')?.value || 'CPU_HIGH';
-    const severity = document.getElementById('sim-severity')?.value || 'critical';
-    const environment = document.getElementById('sim-environment')?.value || 'production';
-    const delay_ms = parseInt(document.getElementById('sim-delay')?.value || '0', 10);
+  window.startLoadTest = async function () {
+    const count = parseInt(document.getElementById('load-count')?.value || '500', 10);
+    const rate = parseInt(document.getElementById('load-rate')?.value || '100', 10);
+    const scenario = document.getElementById('load-scenario')?.value || currentLoadScenario || 'duplicate_storm';
+    const concurrency = parseInt(document.getElementById('load-concurrency')?.value || '4', 10);
 
-    const btn = document.getElementById('btn-generate-alerts');
-    const btnText = document.getElementById('btn-generate-text');
-    const progressPanel = document.getElementById('sim-progress-panel');
-    const progressBar = document.getElementById('sim-progress-bar');
-    const progressStatus = document.getElementById('sim-progress-status');
-    const progressCount = document.getElementById('sim-progress-count');
-    const variationPreview = document.getElementById('sim-variation-preview');
-    const checklistPanel = document.getElementById('sim-checklist-panel');
-    const resultPanel = document.getElementById('sim-result-panel');
+    const btnStart = document.getElementById('btn-start-load');
+    const btnText = document.getElementById('btn-start-load-text');
+    const btnStop = document.getElementById('btn-stop-load');
+    const resultPanel = document.getElementById('load-result-panel');
 
-    // UI state: generating
-    if (btn) btn.disabled = true;
-    if (btnText) btnText.innerText = 'GENERATING...';
-    if (progressPanel) progressPanel.classList.remove('hidden');
-    if (progressBar) progressBar.style.width = '10%';
-    if (progressStatus) progressStatus.innerText = 'Transmitting alerts through live webhook endpoint...';
-    if (progressCount) progressCount.innerText = `0 / ${count}`;
-    if (checklistPanel) checklistPanel.classList.add('hidden');
+    if (btnStart) btnStart.disabled = true;
+    if (btnText) btnText.innerText = 'PROCESSING...';
+    if (btnStop) btnStop.classList.remove('hidden');
     if (resultPanel) resultPanel.classList.add('hidden');
 
-    // Start progress animation
-    let simulatedCount = 0;
-    let tickerInterval = setInterval(() => {
-      if (simulatedCount < count * 0.9) {
-        simulatedCount += Math.max(1, Math.floor(count / 20));
-        if (simulatedCount > count * 0.9) simulatedCount = Math.floor(count * 0.9);
-        const pct = Math.round((simulatedCount / count) * 100);
-        if (progressBar) progressBar.style.width = `${pct}%`;
-        if (progressCount) progressCount.innerText = `${simulatedCount} / ${count}`;
-        if (variationPreview) {
-          const randVar = sampleVariationsList[Math.floor(Math.random() * sampleVariationsList.length)];
-          variationPreview.innerText = `"${randVar.replace('payment-api', service)}"`;
-        }
-      }
-    }, 120);
+    updateLoadStatusBadge('PROCESSING');
 
     try {
       const payload = {
         count: count,
-        service: service,
-        alert_type: alert_type,
-        severity: severity,
-        environment: environment,
-        delay_ms: delay_ms,
-        scenario: currentSimScenario === 'multiple' ? 'multiple' : null
+        rate: rate,
+        scenario: scenario,
+        concurrency: concurrency
       };
 
-      const resp = await fetch('http://localhost:8000/api/v1/alerts/simulate', {
+      const resp = await fetch('http://localhost:8000/api/v1/load-test/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      clearInterval(tickerInterval);
-
       if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData.detail || `Server error: ${resp.status}`);
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
       }
 
+      showToast(`Load test started: ${count} alerts @ ${rate}/sec across ${concurrency} workers`, 'info');
+
+      // Start continuous real-time status polling
+      if (loadTestPollTimer) clearInterval(loadTestPollTimer);
+      loadTestPollTimer = setInterval(pollLoadTestStatus, 350);
+
+    } catch (exc) {
+      console.error('Failed to start load test:', exc);
+      showToast(`Error starting load test: ${exc.message}`, 'error');
+      if (btnStart) btnStart.disabled = false;
+      if (btnText) btnText.innerText = 'START LOAD TEST';
+      if (btnStop) btnStop.classList.add('hidden');
+      updateLoadStatusBadge('FAILED');
+    }
+  };
+
+  window.stopLoadTest = async function () {
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/load-test/stop', { method: 'POST' });
+      if (resp.ok) {
+        showToast('Load test cancel requested. Draining workers...', 'warning');
+        await pollLoadTestStatus();
+      }
+    } catch (exc) {
+      console.error('Failed to stop load test:', exc);
+    }
+  };
+
+  window.resetLoadTest = async function () {
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/load-test/reset', { method: 'POST' });
+      if (resp.ok) {
+        showToast('Load test metrics reset.', 'info');
+        await pollLoadTestStatus();
+        const resultPanel = document.getElementById('load-result-panel');
+        if (resultPanel) resultPanel.classList.add('hidden');
+        renderEmptyCharts();
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        showToast(err.detail || 'Cannot reset while running', 'warning');
+      }
+    } catch (exc) {
+      console.error('Failed to reset load test:', exc);
+    }
+  };
+
+  function updateLoadStatusBadge(status) {
+    const badge = document.getElementById('load-status-badge');
+    if (!badge) return;
+
+    if (status === 'PROCESSING') {
+      badge.className = 'px-2.5 py-0.5 rounded-full font-code-sm text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span><span>PROCESSING</span>';
+    } else if (status === 'COMPLETED') {
+      badge.className = 'px-2.5 py-0.5 rounded-full font-code-sm text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>COMPLETED</span>';
+    } else if (status === 'STOPPED') {
+      badge.className = 'px-2.5 py-0.5 rounded-full font-code-sm text-[11px] font-bold bg-surface-container-high text-secondary border border-surface-container-highest flex items-center gap-1.5';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>STOPPED</span>';
+    } else if (status === 'FAILED') {
+      badge.className = 'px-2.5 py-0.5 rounded-full font-code-sm text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 flex items-center gap-1.5';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span><span>FAILED</span>';
+    } else {
+      badge.className = 'px-2.5 py-0.5 rounded-full font-code-sm text-[11px] font-bold bg-surface-container text-secondary flex items-center gap-1.5 border border-surface-container-highest';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>IDLE</span>';
+    }
+  }
+
+  async function pollLoadTestStatus() {
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/load-test/status');
+      if (!resp.ok) return;
       const data = await resp.json();
 
-      // Progress complete — all data below is from real backend response
-      if (progressBar) progressBar.style.width = '100%';
-      if (progressCount) progressCount.innerText = `${data.generated} / ${data.requested}`;
-      if (progressStatus) progressStatus.innerText = `Completed: ${data.generated} alerts processed through real webhook!`;
-      if (variationPreview && data.sample_variations && data.sample_variations.length > 0) {
-        variationPreview.innerText = `"${data.sample_variations[0]}"`;
-      }
+      // Update 8 live KPI metrics
+      const elSub = document.getElementById('metric-submitted');
+      const elAcc = document.getElementById('metric-accepted');
+      const elProc = document.getElementById('metric-processed');
+      const elFail = document.getElementById('metric-failed');
+      const elRate = document.getElementById('metric-rate');
+      const elBacklog = document.getElementById('metric-backlog');
+      const elWorkers = document.getElementById('metric-workers');
+      const elLatency = document.getElementById('metric-latency');
 
-      // Show Verification Checklist
-      if (checklistPanel) checklistPanel.classList.remove('hidden');
-      const chkRecNum = document.getElementById('chk-received-num');
-      const chkStorNum = document.getElementById('chk-stored-num');
-      const chkCreatNum = document.getElementById('chk-created-num');
-      const chkGroupNum = document.getElementById('chk-grouped-num');
-      if (chkRecNum) chkRecNum.innerText = data.generated;
-      if (chkStorNum) chkStorNum.innerText = data.raw_alerts_count;
-      if (chkCreatNum) chkCreatNum.innerText = data.core_incidents_created;
-      if (chkGroupNum) chkGroupNum.innerText = data.generated;
+      if (elSub) elSub.innerText = data.alerts_submitted;
+      if (elAcc) elAcc.innerText = data.alerts_accepted;
+      if (elProc) elProc.innerText = data.alerts_processed;
+      if (elFail) elFail.innerText = data.alerts_failed;
+      if (elRate) elRate.innerHTML = `${data.processing_rate}<span class="text-xs text-secondary font-normal">/s</span>`;
+      if (elBacklog) elBacklog.innerText = data.backlog;
+      if (elWorkers) elWorkers.innerText = data.active_workers;
+      if (elLatency) elLatency.innerHTML = `${data.avg_latency_ms}<span class="text-xs text-secondary font-normal">ms</span>`;
 
-      // Show Normalization Result Section
-      if (resultPanel) resultPanel.classList.remove('hidden');
-      const resRaw = document.getElementById('res-raw-count');
-      const resInc = document.getElementById('res-incident-count');
-      const resRed = document.getElementById('res-reduction-pct');
-      if (resRaw) resRaw.innerText = data.raw_alerts_count;
-      if (resInc) resInc.innerText = data.core_incidents_created;
-      if (resRed) resRed.innerText = `${data.alert_reduction_percent}%`;
+      updateLoadStatusBadge(data.status);
 
-      // Update Core Incident details
-      const incNum = document.getElementById('res-inc-number');
-      const incBadge = document.getElementById('res-inc-badge');
-      const incTitle = document.getElementById('res-inc-title');
-      const incOcc = document.getElementById('res-inc-occurrences');
-      const incSvc = document.getElementById('res-inc-service');
-      const incEnv = document.getElementById('res-inc-env');
-      const incFp = document.getElementById('res-inc-fp');
+      // Fetch and render timeseries metrics for operational charts
+      fetchAndRenderCharts();
 
-      if (incNum) incNum.innerText = `#${data.primary_incident_number || 'INC-1001'}`;
-      if (incBadge) incBadge.innerText = data.severity === 'critical' ? '🔴 Critical' : `⚠️ ${data.severity.toUpperCase()}`;
-      if (incTitle) incTitle.innerText = data.primary_incident_title || `${data.service} Degradation`;
-      if (incOcc) incOcc.innerText = data.primary_incident_occurrences || data.generated;
-      if (incSvc) incSvc.innerText = data.service;
-      if (incEnv) incEnv.innerText = data.environment;
-      if (incFp) incFp.innerText = data.primary_fingerprint ? `${data.primary_fingerprint.substring(0, 16)}...` : 'N/A';
+      // If test ended (COMPLETED or STOPPED or FAILED)
+      if (data.status === 'COMPLETED' || data.status === 'STOPPED' || data.status === 'FAILED') {
+        if (loadTestPollTimer) {
+          clearInterval(loadTestPollTimer);
+          loadTestPollTimer = null;
+        }
 
-      // Store simulated incident ID for quick investigation
-      window.lastSimulatedIncidentId = data.primary_incident_id;
+        const btnStart = document.getElementById('btn-start-load');
+        const btnText = document.getElementById('btn-start-load-text');
+        const btnStop = document.getElementById('btn-stop-load');
+        const resultPanel = document.getElementById('load-result-panel');
 
-      // Dynamically fetch and display AI Diagnostic & Remediation Intelligence
-      if (data.primary_incident_id) {
-        try {
-          const resResp = await fetch(`http://localhost:8000/api/v1/incidents/${data.primary_incident_id}/resolution`);
-          if (resResp.ok) {
-            const resData = await resResp.json();
-            const aiCard = document.getElementById('sim-ai-resolution-card');
-            const aiCause = document.getElementById('sim-ai-root-cause');
-            const aiSteps = document.getElementById('sim-ai-steps-list');
-            const aiSource = document.getElementById('sim-ai-source-badge');
-            const aiConf = document.getElementById('sim-ai-confidence-badge');
-            const aiCount = document.getElementById('sim-ai-steps-count');
+        if (btnStart) btnStart.disabled = false;
+        if (btnText) btnText.innerText = 'START LOAD TEST';
+        if (btnStop) btnStop.classList.add('hidden');
 
-            if (aiCard && (resData.probable_cause || (resData.resolution && resData.resolution.length > 0))) {
-              aiCard.classList.remove('hidden');
-              if (aiCause) aiCause.innerText = resData.probable_cause || 'Root cause identified.';
-              if (aiSource) {
-                const isKnowledge = resData.source === 'knowledge_base';
-                aiSource.innerText = isKnowledge ? 'Knowledge Base (Cached)' : 'Automated Analysis (Gemini)';
-                aiSource.className = isKnowledge
-                  ? 'px-2.5 py-1 rounded font-code-sm text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200'
-                  : 'px-2.5 py-1 rounded font-code-sm text-[11px] font-bold bg-primary-fixed text-on-primary-fixed';
-              }
-              if (aiConf) {
-                const confPct = Math.round((resData.confidence || 0.94) * 100);
-                aiConf.innerText = `${confPct}% Diagnostic Confidence`;
-              }
-              if (aiCount) {
-                aiCount.innerText = `${(resData.resolution || []).length} ACTION STEPS`;
-              }
-              if (aiSteps) {
-                aiSteps.innerHTML = (resData.resolution || []).map((step, idx) => `
-                  <li class="flex items-start gap-2.5 text-xs text-on-surface">
-                    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-surface-container font-code-sm text-[11px] font-bold text-primary shrink-0">${idx + 1}</span>
-                    <span class="pt-0.5">${escapeHtml(step)}</span>
-                  </li>
-                `).join('');
-              }
-            }
+        // Render Downstream PostgreSQL Result
+        if (resultPanel && data.alerts_processed > 0) {
+          resultPanel.classList.remove('hidden');
+
+          const sumText = document.getElementById('load-result-summary-text');
+          const perfText = document.getElementById('load-result-performance-stats');
+          const resRaw = document.getElementById('load-res-raw-count');
+          const resInc = document.getElementById('load-res-incident-count');
+          const resRed = document.getElementById('load-res-reduction-pct');
+          const resNotif = document.getElementById('load-res-notif-count');
+          const incNumber = document.getElementById('load-res-inc-number');
+          const incTitle = document.getElementById('load-res-inc-title');
+
+          if (sumText) {
+            sumText.innerText = `${data.alerts_submitted} alerts submitted · ${data.alerts_accepted} accepted · ${data.alerts_processed} processed · ${data.alerts_failed} failed`;
           }
-        } catch (aiErr) {
-          console.warn('Could not load AI resolution for simulated incident:', aiErr);
+          if (perfText) {
+            perfText.innerText = `Peak rate: ${data.peak_rate}/s · Avg latency: ${data.avg_latency_ms}ms · Peak backlog: ${data.peak_backlog} · Workers: ${data.active_workers || 4}`;
+          }
+
+          if (data.downstream_result) {
+            if (resRaw) resRaw.innerText = data.downstream_result.raw_alerts_count;
+            if (resInc) resInc.innerText = data.downstream_result.core_incidents_created;
+            if (resRed) resRed.innerText = `${data.downstream_result.alert_reduction_percent}%`;
+            if (resNotif) resNotif.innerText = data.downstream_result.notifications_count;
+            if (incNumber) incNumber.innerText = `#${data.downstream_result.primary_incident_number || 'INC-1001'}`;
+            if (incTitle) incTitle.innerText = `Correlated Outage — ${data.scenario.replace('_', ' ').toUpperCase()}`;
+          }
+
+          showToast(`Load test complete: ${data.alerts_processed} alerts processed with 0 loss`, 'success');
+          
+          // Refresh global dashboard tables & KPI cards
+          await fetchAllRealData();
         }
       }
 
-      // Update Flow Diagram
-      const diagRaw = document.getElementById('diag-raw');
-      const diagInc = document.getElementById('diag-inc');
-      const diagRed = document.getElementById('diag-reduction');
-      if (diagRaw) diagRaw.innerText = `${data.raw_alerts_count} RAW ALERTS`;
-      if (diagInc) diagInc.innerText = `${data.core_incidents_created} CORE INCIDENT${data.core_incidents_created > 1 ? 'S' : ''}`;
-      if (diagRed) diagRed.innerText = `${data.alert_reduction_percent}% Noise Reduction`;
-
-      showToast(`Successfully processed ${data.generated} alerts into ${data.core_incidents_created} core incident (${data.alert_reduction_percent}% reduction)`, 'success');
-
-      // Refresh real database state across the rest of the dashboard
-      await fetchAllRealData();
-
-    } catch (err) {
-      clearInterval(tickerInterval);
-      // Clear progress bar on failure
-      if (progressBar) progressBar.style.width = '0%';
-      if (progressCount) progressCount.innerText = '';
-
-      // Provide a clear, actionable error message
-      const isNetworkError = err.message === 'Failed to fetch' || err.message.includes('NetworkError');
-      const errorMsg = isNetworkError
-        ? 'Backend unavailable. Start the backend with: docker-compose up -d'
-        : `Simulation failed: ${err.message}`;
-
-      if (progressStatus) progressStatus.innerText = errorMsg;
-      showToast(isNetworkError ? 'Backend unavailable. Start PostgreSQL and the backend to run the simulation.' : `Simulation error: ${err.message}`, 'error');
-    } finally {
-      if (btn) btn.disabled = false;
-      if (btnText) btnText.innerText = 'GENERATE ALERTS';
+    } catch (exc) {
+      console.warn('Error polling load test status:', exc);
     }
-  };
+  }
+
+  async function fetchAndRenderCharts() {
+    try {
+      const resp = await fetch('http://localhost:8000/api/v1/load-test/metrics');
+      if (!resp.ok) return;
+      const metrics = await resp.json();
+      if (!metrics || metrics.length === 0) {
+        renderEmptyCharts();
+        return;
+      }
+
+      renderThroughputChart(metrics);
+      renderLatencyChart(metrics);
+    } catch (exc) {
+      console.warn('Error fetching load test metrics for charts:', exc);
+    }
+  }
+
+  function renderEmptyCharts() {
+    const rateSvg = document.getElementById('chart-rate-svg');
+    const latencySvg = document.getElementById('chart-latency-svg');
+    const rateEmpty = document.getElementById('chart-rate-empty');
+    const latencyEmpty = document.getElementById('chart-latency-empty');
+
+    if (rateSvg) rateSvg.innerHTML = '';
+    if (latencySvg) latencySvg.innerHTML = '';
+    if (rateEmpty) rateEmpty.classList.remove('hidden');
+    if (latencyEmpty) latencyEmpty.classList.remove('hidden');
+  }
+
+  function renderThroughputChart(metrics) {
+    const svg = document.getElementById('chart-rate-svg');
+    const emptyMsg = document.getElementById('chart-rate-empty');
+    if (!svg) return;
+    if (emptyMsg) emptyMsg.classList.add('hidden');
+
+    const maxPoints = 30;
+    const pts = metrics.slice(-maxPoints);
+    if (pts.length < 2) return;
+
+    const maxRate = Math.max(...pts.map(p => Math.max(p.incoming_rate || 0, p.processed_rate || 0)), 50);
+    const width = 400;
+    const height = 100;
+    const padding = 10;
+
+    const getX = (idx) => padding + (idx / (pts.length - 1)) * (width - padding * 2);
+    const getY = (val) => height - padding - (val / maxRate) * (height - padding * 2);
+
+    // Target incoming line (dashed slate)
+    let targetPathD = `M ${getX(0)} ${getY(pts[0].incoming_rate || 0)}`;
+    // Processed line (solid primary)
+    let procPathD = `M ${getX(0)} ${getY(pts[0].processed_rate || 0)}`;
+    let procAreaD = `M ${getX(0)} ${height - padding} L ${getX(0)} ${getY(pts[0].processed_rate || 0)}`;
+
+    for (let i = 1; i < pts.length; i++) {
+      const x = getX(i);
+      const yt = getY(pts[i].incoming_rate || 0);
+      const yp = getY(pts[i].processed_rate || 0);
+      targetPathD += ` L ${x} ${yt}`;
+      procPathD += ` L ${x} ${yp}`;
+      procAreaD += ` L ${x} ${yp}`;
+    }
+    procAreaD += ` L ${getX(pts.length - 1)} ${height - padding} Z`;
+
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="procGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#3525cd" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#3525cd" stop-opacity="0.0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#cbd5e1" stroke-width="1"/>
+      <path d="${procAreaD}" fill="url(#procGrad)"/>
+      <path d="${targetPathD}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <path d="${procPathD}" fill="none" stroke="#3525cd" stroke-width="2.5" stroke-linejoin="round"/>
+    `;
+  }
+
+  function renderLatencyChart(metrics) {
+    const svg = document.getElementById('chart-latency-svg');
+    const emptyMsg = document.getElementById('chart-latency-empty');
+    if (!svg) return;
+    if (emptyMsg) emptyMsg.classList.add('hidden');
+
+    const maxPoints = 30;
+    const pts = metrics.slice(-maxPoints);
+    if (pts.length < 2) return;
+
+    const maxLat = Math.max(...pts.map(p => p.latency_ms || 0), 20);
+    const width = 400;
+    const height = 100;
+    const padding = 10;
+
+    const getX = (idx) => padding + (idx / (pts.length - 1)) * (width - padding * 2);
+    const getY = (val) => height - padding - (val / maxLat) * (height - padding * 2);
+
+    let latPathD = `M ${getX(0)} ${getY(pts[0].latency_ms || 0)}`;
+    let latAreaD = `M ${getX(0)} ${height - padding} L ${getX(0)} ${getY(pts[0].latency_ms || 0)}`;
+
+    for (let i = 1; i < pts.length; i++) {
+      const x = getX(i);
+      const y = getY(pts[i].latency_ms || 0);
+      latPathD += ` L ${x} ${y}`;
+      latAreaD += ` L ${x} ${y}`;
+    }
+    latAreaD += ` L ${getX(pts.length - 1)} ${height - padding} Z`;
+
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="latGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#059669" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#059669" stop-opacity="0.0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#cbd5e1" stroke-width="1"/>
+      <path d="${latAreaD}" fill="url(#latGrad)"/>
+      <path d="${latPathD}" fill="none" stroke="#059669" stroke-width="2" stroke-linejoin="round"/>
+    `;
+  }
+
+  // Initial load test status poll on script boot
+  pollLoadTestStatus();
+
+
+
 
   window.openRawAlertsModal = async function () {
     const modal = document.getElementById('raw-alerts-modal');

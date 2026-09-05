@@ -387,6 +387,7 @@ class LoadTestManager:
                         self.alerts_processed += 1
                     else:
                         self.alerts_failed += 1
+                        logger.warning(f"Worker {worker_id} request non-201: status={resp.status_code}, body={resp.text[:200]}")
 
                     self._recent_latencies.append(latency)
                     if len(self._recent_latencies) > 100:
